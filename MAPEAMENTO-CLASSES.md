@@ -82,782 +82,187 @@ Todos os tipos abaixo estão declarados **localmente dentro de cada página** (n
 
 | Campo | Tipo TS | Observação |
 |---|---|---|
-| `id` | `string` | UUID do backend |
+| `id` | `string` | UUID (não `number`) |
 | `tipo` | `"PF" \| "PJ"` | |
-| `documento` | `string` | CPF ou CNPJ **sem formatação** (backend envia `12345678901234`) |
-| `nome` | `string` | Nome ou razão social |
+| `documento` | `string` | Sem formatação (`12345678901234`); formatar só na exibição |
+| `nome` | `string` | |
 | `nomeFantasia` | `string?` | Obrigatório para PJ |
 | `email` | `string` | |
-| `telefone` | `string` | Sem formatação (backend envia `11987654321`) |
-| `cep` | `string` | 8 dígitos sem formatação |
+| `telefone` | `string` | Sem formatação (`11987654321`) |
+| `cep` | `string` | |
 | `logradouro` | `string` | |
 | `numero` | `string` | |
-| `complemento` | `string?` | Opcional |
+| `complemento` | `string?` | |
 | `bairro` | `string` | |
 | `cidade` | `string` | |
-| `uf` | `string` | 2 caracteres |
+| `uf` | `string` | |
 | `inscricaoEstadual` | `string?` | Para PJ |
-| `ativo` | `boolean` | Backend usa boolean, não "ativo"|"inativo" |
-| `totalCompras` | `number` | Contagem de compras (campo calculado) |
-| `valorTotalCompras` | `number` | Valor total em compras (campo calculado do backend) |
-| `ultimaCompra` | `string` | ISO 8601 (`2024-09-15T14:30:00Z`) - formatar no frontend |
-| `dataCriacao` | `string` | ISO 8601 |
-| `dataAtualizacao` | `string` | ISO 8601 |
+| `ativo` | `boolean` | Back usa boolean; mapear para `"ativo"`/`"inativo"` se necessário |
+| `totalCompras` | `number` | |
+| `valorTotalCompras` | `number` | |
+| `ultimaCompra` | `string` | ISO 8601; converter para `dd/MM/yyyy` na exibição |
 
-**Formatação no Frontend:**
-- `documento`: Formatar apenas na exibição com `formatarDocumento(doc, tipo)`
-- `telefone`: Formatar apenas na exibição com `formatarTelefone(tel)`
-- `ultimaCompra`: Converter ISO 8601 para `dd/MM/yyyy` na exibição
-- `ativo`: Mapear `true → "ativo"`, `false → "inativo"` para compatibilidade com código existente
-
-Origem: `GET /api/clientes` (paginado). Filtros: tipo (`PF`/`PJ`), busca (nome, email, documento), cidade, uf, ativo.
+Origem: `GET /api/clientes` (retorna `{items: Cliente[], lastKey?: string, count: number}` para paginação).
 
 ### 3.2 `Produto` — `pages/Estoque.tsx:4`
 
 | Campo | Tipo TS | Observação |
 |---|---|---|
-| `id` | `string` | UUID do backend |
-| `codigo` | `string` | SKU interno, ex.: `PF-001` |
+| `id` | `string` | UUID (não `number`) |
+| `codigo` | `string` | SKU interno |
 | `nome` | `string` | |
-| `descricao` | `string?` | Descrição detalhada (opcional) |
-| `ncm` | `string` | Sem formatação (`87083010`) - formatar no frontend |
-| `cest` | `string?` | Código CEST (opcional) |
-| `categoria` | `string` | Ex: "Freios", "Motor", "Suspensão" |
-| `fabricante` | `string?` | Nome do fabricante (opcional) |
-| `codigoFabricante` | `string?` | Código do fabricante (opcional) |
-| `precoCusto` | `number` | Preço de custo (R$) |
-| `precoVenda` | `number` | Preço de venda (R$) |
-| `margemLucro` | `number` | Percentual calculado pelo backend |
-| `estoqueMinimo` | `number` | Estoque mínimo |
-| `cfop` | `string?` | CFOP padrão (ex: "5102") |
-| `origem` | `string?` | Origem da mercadoria (0-8) |
-| `cstIcms` | `string?` | CST ICMS (ex: "00") |
-| `aliquotaIcms` | `number?` | Alíquota ICMS em % |
-| `ativo` | `boolean` | Produto ativo/inativo |
-| `dataCriacao` | `string` | ISO 8601 |
-| `dataAtualizacao` | `string` | ISO 8601 |
-| `estoque` | `EstoqueInfo` | **Objeto aninhado** (ver estrutura abaixo) |
+| `ncm` | `string` | Sem formatação (`87083010`); formatar só na exibição |
+| `categoria` | `string` | |
+| `precoCusto` | `number` | |
+| `precoVenda` | `number` | |
+| `estoqueMinimo` | `number` | |
+| `ativo` | `boolean` | |
+| `estoque` | objeto | `{ estoqueAtual, reservado, disponivel, status, ultimaMovimentacao }` |
 
-#### 3.2.1 `EstoqueInfo` — Objeto aninhado
+Back retorna **objeto aninhado** para estoque. Status (`ok`/`atencao`/`baixo`/`critico`) já calculado no back — **não recalcular no front**.
 
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `estoqueAtual` | `number` | Quantidade física atual |
-| `reservado` | `number` | Quantidade reservada em vendas/orçamentos |
-| `disponivel` | `number` | Calculado: `estoqueAtual - reservado` |
-| `status` | `"ok" \| "atencao" \| "baixo" \| "critico"` | Calculado pelo backend |
-| `ultimaMovimentacao` | `string` | ISO 8601 da última movimentação |
+Mapeamento para código legado:
+- `estoque` (number) = `estoque.estoqueAtual`
+- `minimo` = `estoqueMinimo`
+- `custo` = `precoCusto`
+- `venda` = `precoVenda`
+- `status` = `estoque.status`
 
-**Regras de Status (calculadas no backend):**
-```
-critico  → estoqueAtual <= estoqueMinimo × 0.4
-baixo    → estoqueAtual <  estoqueMinimo × 0.7
-atencao  → estoqueAtual <  estoqueMinimo
-ok       → estoqueAtual >= estoqueMinimo
-```
+Origem: `GET /api/produtos`.
 
-**Formatação no Frontend:**
-- `ncm`: Formatar apenas na exibição com `formatarNCM(ncm)` → `"8708.30.10"`
-- **NÃO calcular status no frontend** - usar o valor retornado pelo backend
-- **Para compatibilidade com código legado**, mapear:
-  - `produto.estoque.estoqueAtual` → `produto.estoque` (flat)
-  - `produto.estoqueMinimo` → `produto.minimo`
-  - `produto.precoCusto` → `produto.custo`
-  - `produto.precoVenda` → `produto.venda`
-
-Origem: `GET /api/produtos` (paginado). Filtros: busca (nome, código, NCM), categoria, status, ativo.
-
-### 3.3 `ItemCarrinho` — `pages/PDV.tsx:20` (Apenas Frontend)
+### 3.3 `ItemCarrinho` — `pages/PDV.tsx:20`
 
 | Campo | Tipo TS | Observação |
 |---|---|---|
-| `produtoId` | `string` | UUID do produto (obrigatório para API) |
-| `codigo` | `string` | SKU do produto (apenas para exibição) |
-| `nome` | `string` | Nome do produto (apenas para exibição) |
+| `produtoId` | `string` | UUID (back espera isso, não `codigo`) |
+| `codigo` | `string` | Só exibição |
+| `nome` | `string` | Só exibição |
 | `quantidade` | `number` | Mínimo 1 |
-| `valorUnitario` | `number` | **Editável na venda** (pode divergir de `precoVenda`) |
-| `editandoPreco` | `boolean` | Somente UI, **não enviar ao back** |
-| `precoTemp` | `string` | Somente UI, **não enviar ao back** |
+| `valorUnitario` | `number` | Editável |
+| `editandoPreco` | `boolean` | **Não enviar** (só UI) |
+| `precoTemp` | `string` | **Não enviar** (só UI) |
 
-**Importante:** Ao enviar para API, converter para `ItemVendaRequest`:
+Ao enviar para `POST /api/vendas`, itens devem ter apenas `{ produtoId, quantidade, valorUnitario }`.
 
-#### 3.3.1 `ItemVendaRequest` — Payload para API
+### 3.4 Tipos auxiliares do PDV — `pages/PDV.tsx:30-41`
 
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `produtoId` | `string` | UUID do produto |
-| `quantidade` | `number` | Quantidade vendida |
-| `valorUnitario` | `number` | Preço unitário (pode ser editado) |
-
-**Conversão:**
-```typescript
-function converterItemCarrinho(item: ItemCarrinho): ItemVendaRequest {
-  return {
-    produtoId: item.produtoId,
-    quantidade: item.quantidade,
-    valorUnitario: item.valorUnitario,
-  };
-  // NÃO enviar: id, codigo, nome, editandoPreco, precoTemp
-}
-```
-
-### 3.4 PDV e Venda — `pages/PDV.tsx`
-
-#### 3.4.1 Tipos Enumerados
-
-```typescript
+```ts
 type TipoDocumento    = "nfe" | "nfce";
 type Modalidade       = "fisica" | "virtual";
 type DestinoMoeda     = "banco" | "cofre";
 type MetodoPagamento  = "dinheiro" | "credito" | "debito" | "pix" | "boleto";
 type BandeiraCartao   = "mastercard" | "visa" | "elo" | "outros";
-type StatusVenda      = "orcamento" | "finalizada" | "cancelada";
 ```
 
-#### 3.4.2 Estado do PDV (Frontend)
+Estado do PDV: `tipoDocumento`, `consumidorIdentificado`, `carrinho`, `modalidade`, `metodoPagamento`, `bandeira`, `destinoMoeda`, `desconto`. Campos de CPF/CNPJ e nome não estão em estado (inputs soltos).
 
-Estado gerenciado via `useState`:
-- `tipoDocumento`: "nfe" | "nfce"
-- `consumidorIdentificado`: boolean (se true: NF-e, se false: NFC-e)
-- `carrinho`: ItemCarrinho[] (ver seção 3.3)
-- `modalidade`: "fisica" | "virtual"
-- `metodoPagamento`: MetodoPagamento
-- `bandeira`: BandeiraCartao (apenas se método = crédito/débito)
-- `destinoMoeda`: DestinoMoeda (apenas se método = dinheiro)
-- `desconto`: number (em R$, não percentual)
-
-**Campos de Cliente (soltos no formulário):**
-- CPF/CNPJ: `<input>` sem estado (usar ref ou buscar no DOM)
-- Nome: `<input>` sem estado
-
-#### 3.4.3 Request de Venda (Payload para API)
-
-**Endpoint:** `POST /api/vendas`
-
-```typescript
-interface VendaRequest {
-  tipoDocumento: "nfe" | "nfce";
-  modalidade: "fisica" | "virtual";
-  clienteId: string | null;  // ← UUID ou null (consumidor final)
-  metodoPagamento: MetodoPagamento;
-  bandeira?: BandeiraCartao;         // Se crédito/débito
-  destinoDinheiro?: DestinoMoeda;    // Se dinheiro
-  desconto: number;
-  status: "orcamento" | "finalizada";
-  itens: ItemVendaRequest[];
-}
-```
-
-**Exemplo de Payload:**
-```json
-{
-  "tipoDocumento": "nfce",
-  "modalidade": "fisica",
-  "clienteId": null,
-  "metodoPagamento": "credito",
-  "bandeira": "visa",
-  "destinoDinheiro": null,
-  "desconto": 0,
-  "status": "finalizada",
-  "itens": [
-    {
-      "produtoId": "uuid-do-produto",
-      "quantidade": 2,
-      "valorUnitario": 89.90
-    }
-  ]
-}
-```
-
-#### 3.4.4 Lógica de Cliente no PDV
-
-**Cenário 1: Consumidor Não Identificado (NFC-e)**
-```typescript
-// clienteId = null
-const venda = {
-  tipoDocumento: "nfce",
-  clienteId: null,
-  // ... outros campos
-};
-```
-
-**Cenário 2: Cliente Identificado (NF-e ou NFC-e com CPF)**
-```typescript
-async function prepararVenda() {
-  let clienteId: string | null = null;
-  
-  if (consumidorIdentificado) {
-    const cpfCnpj = document.getElementById('cpf-cnpj').value;
-    
-    // 1. Buscar cliente existente
-    const clientes = await fetch(`/api/clientes?documento=${limparDocumento(cpfCnpj)}`);
-    const data = await clientes.json();
-    
-    if (data.items.length > 0) {
-      clienteId = data.items[0].id;
-    } else {
-      // 2. Criar cliente rápido
-      const nome = document.getElementById('nome-cliente').value;
-      const tipo = cpfCnpj.length === 11 ? "PF" : "PJ";
-      
-      const novoCliente = await fetch('/api/clientes', {
-        method: 'POST',
-        body: JSON.stringify({
-          tipo,
-          documento: limparDocumento(cpfCnpj),
-          nome,
-          email: `cliente${Date.now()}@temp.com`, // Temporário
-          telefone: "00000000000", // Temporário
-          cidade: "Não informado",
-          uf: "MG",
-          // Campos obrigatórios mínimos
-        }),
-      });
-      
-      const clienteData = await novoCliente.json();
-      clienteId = clienteData.id;
-    }
-  }
-  
-  return clienteId;
-}
-```
-
-#### 3.4.5 Cálculo de Totais
-
-**Frontend (Validação):**
-```typescript
-const subtotal = carrinho.reduce(
-  (sum, item) => sum + (item.quantidade * item.valorUnitario), 
-  0
-);
-const total = subtotal - desconto;
-```
-
-**Backend:** Recalcula e valida. Frontend NÃO envia subtotal/total.
-
-#### 3.4.6 Regras de Validação
-
-| Regra | Descrição |
-|-------|-----------|
-| NF-e → Cliente obrigatório | Se `tipoDocumento = "nfe"`, `clienteId` não pode ser null |
-| NFC-e → Cliente opcional | Se `tipoDocumento = "nfce"`, `clienteId` pode ser null |
-| Bandeira para cartão | Se `metodoPagamento` = "credito" ou "debito", `bandeira` é obrigatória |
-| Destino para dinheiro | Se `metodoPagamento` = "dinheiro", `destinoDinheiro` é obrigatório |
-| Mínimo 1 item | Array `itens` deve ter pelo menos 1 elemento |
-| Estoque disponível | Backend valida se há estoque para cada item |
-| Desconto | Não pode ser negativo nem maior que subtotal |
-
-#### 3.4.7 Response da API
-
-```json
-{
-  "id": "uuid-da-venda",
-  "numero": "VD-000126",
-  "tipoDocumento": "nfce",
-  "subtotal": 179.80,
-  "desconto": 0,
-  "total": 179.80,
-  "status": "finalizada",
-  "criadaEm": "2024-09-20T15:00:00Z",
-  "finalizadaEm": "2024-09-20T15:00:00Z",
-  "notaFiscalId": null,  // Será preenchido após emissão
-  "itens": [...]
-}
-```
-
-**Pós-venda:**
-- Se `status = "finalizada"`: Backend dispara emissão fiscal automaticamente
-- Nota será emitida de forma assíncrona
-- Para acompanhar: Consultar `GET /api/notas?vendaId={id}`
+**Back espera** (`POST /api/vendas`):
+- `clienteId: string | null` — UUID do cliente ou null (consumidor final)
+- NF-e exige `clienteId` não-null; NFC-e aceita null
+- Front deve buscar cliente por documento ou criar rápido antes de enviar venda
 
 ### 3.5 Nota fiscal (painel) — `pages/PainelFiscal.tsx:3`
 
 | Campo | Tipo TS | Observação |
 |---|---|---|
-| `id` | `string` | UUID do backend |
-| `tipo` | `"NFE" \| "NFCE" \| "DEVOLUCAO" \| "ENTRADA"` | Tipo da nota |
-| `modelo` | `string` | "55" (NF-e) ou "65" (NFC-e) |
-| `numero` | `string` | `"000126"` (com zeros à esquerda) |
-| `serie` | `string` | Padrão "1" |
+| `id` | `string` | UUID (não `number`) |
+| `numero` | `string` | Com zeros: `"000126"` |
+| `serie` | `string` | |
+| `cliente` | `string` | Nome ou "Consumidor Final" (back não retorna CNPJ na lista) |
+| `valorTotal` | `number` | Back usa `valorTotal`, não `valor` |
+| `emitidaEm` | `string` | ISO 8601; separar em `data` (dd/MM/yyyy) e `hora` (HH:mm) |
+| `status` | `string` | `processando` \| `autorizada` \| `rejeitada` \| `cancelada` |
 | `chaveAcesso` | `string` | 44 dígitos |
-| `vendaId` | `string?` | UUID da venda (se aplicável) |
-| `clienteId` | `string?` | UUID do cliente (null para consumidor final) |
-| `cliente` | `string?` | Nome do cliente (apenas para exibição na listagem) |
-| `valorTotal` | `number` | Valor total da nota |
-| `emitidaEm` | `string` | ISO 8601 - separar em data e hora no frontend |
-| `autorizadaEm` | `string?` | ISO 8601 (null se não autorizada) |
-| `status` | `"processando" \| "autorizada" \| "rejeitada" \| "cancelada"` | Status atual |
-| `protocolo` | `string?` | Protocolo SEFAZ (quando autorizada) |
-| `codigoStatus` | `string?` | Código retorno SEFAZ (ex: "100") |
-| `motivoRejeicao` | `string?` | Motivo se rejeitada |
-| `ambiente` | `"producao" \| "homologacao"` | Ambiente de emissão |
-| `xmlPath` | `string?` | Caminho S3 do XML |
-| `pdfPath` | `string?` | Caminho S3 do PDF |
 
-**Formatação no Frontend:**
-- `emitidaEm`: Separar em `data` (dd/MM/yyyy) e `hora` (HH:mm)
-- Se backend não retornar campo `cliente`, buscar pelo `clienteId` ou exibir "Consumidor Final"
-
-**Observação sobre CNPJ:**
-- Backend **não retorna CNPJ** na listagem
-- Para exibir CNPJ, é necessário:
-  1. Fazer requisição adicional `GET /api/clientes/{clienteId}`, ou
-  2. Backend adicionar campo `clienteDocumento` na resposta da listagem
+Origem: `GET /api/notas` (paginado).
 
 ### 3.6 `NotaParaCancelar` — `pages/Cancelamento.tsx:4`
 
 | Campo | Tipo TS |
 |---|---|
-| `id` | `string` | UUID |
+| `id` | `string` |
 | `numero` | `string` |
 | `serie` | `string` |
-| `cliente` | `string?` | Nome do cliente ou "Consumidor Final" |
-| `valorTotal` | `number` | Usar este campo (backend não tem campo `valor`) |
-| `emitidaEm` | `string` | ISO 8601 - formatar para `dd/MM/yyyy` no frontend |
-| `autorizadaEm` | `string` | ISO 8601 |
-| `chaveAcesso` | `string` | 44 dígitos |
-| `status` | `"autorizada"` | Filtrar apenas autorizadas |
-| `protocolo` | `string` | Protocolo de autorização |
+| `cliente` | `string` |
+| `valorTotal` | `number` |
+| `emitidaEm` | `string` | ISO 8601; formatar para dd/MM/yyyy |
+| `chaveAcesso` | `string` |
+| `status` | `"autorizada"` |
 
-**Endpoint:** `GET /api/notas?status=autorizada`
+Listar apenas `status === "autorizada"`. Formulário: `justificativa` (≥ 15 caracteres).
 
-**Formulário de Cancelamento:**
-- `justificativa`: string, mínimo 15 caracteres (validado no backend também)
-
-**Endpoint de Cancelamento:** `POST /api/notas/{id}/cancelamento`
-```json
-{
-  "justificativa": "Mínimo 15 caracteres"
-}
-```
-
-**Validação de Prazo:**
-- Backend valida prazo de 24h desde `autorizadaEm`
-- Frontend deve tratar erro 400 se prazo expirado
+Endpoint: `POST /api/notas/{id}/cancelamento` com `{ justificativa }`. Back valida prazo de 24h.
 
 ### 3.7 Inutilização — `pages/Inutilizacao.tsx`
 
-#### 3.7.1 Formulário de Inutilização
+Formulário:
 
-| Campo | Tipo TS | Regra |
+| Campo | Tipo | Regra |
 |---|---|---|
 | `serie` | `string` | Padrão `"1"` |
-| `numeroInicial` | `number` | Numérico, ≥ 1 (converter de string para number ao enviar) |
-| `numeroFinal` | `number` | ≥ `numeroInicial` (converter de string para number) |
-| `justificativa` | `string` | ≥ 15 caracteres (após `trim`) |
+| `numeroInicial` | `number` | Converter de string ao enviar |
+| `numeroFinal` | `number` | ≥ `numeroInicial`; converter de string |
+| `justificativa` | `string` | ≥ 15 caracteres (após trim) |
 
-**Endpoint:** `POST /api/notas/inutilizacao`
-```json
-{
-  "serie": "1",
-  "numeroInicial": 100,
-  "numeroFinal": 105,
-  "justificativa": "Mínimo 15 caracteres"
-}
-```
-
-**Conversão no Frontend:**
-```typescript
-const payload = {
-  serie: form.serie,
-  numeroInicial: parseInt(form.numeroInicial),  // ← Converter
-  numeroFinal: parseInt(form.numeroFinal),      // ← Converter
-  justificativa: form.justificativa,
-};
-```
-
-#### 3.7.2 Histórico de Inutilizações
-
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `id` | `string` | UUID |
-| `serie` | `string` |
-| `numeroInicial` | `number` | Backend usa este nome |
-| `numeroFinal` | `number` | Backend usa este nome |
-| `quantidade` | `number` | Calculado: `numeroFinal - numeroInicial + 1` |
-| `justificativa` | `string` |
-| `protocolo` | `string?` | Protocolo SEFAZ |
-| `registradaEm` | `string` | ISO 8601 - formatar para dd/MM/yyyy |
-| `status` | `string` | "inutilizada" ou "processando" |
-
-**Endpoint:** `GET /api/notas/inutilizacao` (assumindo que existe)
+Endpoint: `POST /api/notas/inutilizacao`. Back espera `numeroInicial` e `numeroFinal` como `number`, não string.
 
 ### 3.8 `ItemDevolucao` e nota referenciada — `pages/NotaDevolucao.tsx`
 
-#### 3.8.1 Nota Referenciada (para seleção)
-
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `id` | `string` | UUID da nota |
-| `numero` | `string` |
-| `serie` | `string` |
-| `cliente` | `string?` | Nome do cliente |
-| `valorTotal` | `number` |
-| `emitidaEm` | `string` | ISO 8601 - formatar para dd/MM/yyyy |
-| `chaveAcesso` | `string` |
-| `status` | `"autorizada"` | Apenas notas autorizadas |
-
-**Endpoint:** `GET /api/notas?status=autorizada&tipo=NFE,NFCE`
-
-#### 3.8.2 Item da Nota Original (retornado pelo backend)
-
-**Endpoint:** `GET /api/notas/{id}/itens` (deve ser adicionado ao backend se não existir)
-
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `itemId` | `string` | UUID do item na nota (necessário para devolução) |
-| `produtoId` | `string` | UUID do produto |
-| `codigo` | `string` | SKU do produto |
-| `nome` | `string` | Nome do produto |
-| `ncm` | `string` | NCM |
-| `quantidade` | `number` | Quantidade original vendida |
-| `valorUnitario` | `number` | Valor unitário na venda |
-| `valorTotal` | `number` | Valor total do item |
-
-#### 3.8.3 Item de Devolução (Frontend + Payload)
-
-**Frontend (Interface local com controle de quantidade):**
-```typescript
+```ts
 interface ItemDevolucao {
-  itemId: string;          // UUID do item na nota original
-  codigo: string;          // Para exibição
-  nome: string;            // Para exibição
-  qtdOriginal: number;     // Quantidade vendida
-  qtdDevolver: number;     // Editável: 0 ≤ qtdDevolver ≤ qtdOriginal
-  valorUnitario: number;   // Para cálculo do total
+  itemId: string;        // UUID do item na nota original (necessário!)
+  codigo: string;        // Só exibição
+  nome: string;          // Só exibição
+  qtdOriginal: number;
+  qtdDevolver: number;   // 0 ≤ qtdDevolver ≤ qtdOriginal
+  valorUnitario: number;
 }
 ```
 
-**Payload para API:**
-```typescript
-interface ItemDevolucaoRequest {
-  itemId: string;           // UUID do item na nota
-  quantidadeDevolver: number;  // Quantidade a devolver
-}
-```
+Back precisa de endpoint `GET /api/notas/{id}/itens` para retornar itens com `itemId`.
 
-**Endpoint de Devolução:** `POST /api/notas/devolucao`
-```json
-{
-  "notaReferenciadaId": "uuid-da-nota-original",
-  "motivo": "Produto com defeito",
-  "itens": [
-    {
-      "itemId": "uuid-do-item",
-      "quantidadeDevolver": 1
-    }
-  ]
-}
-```
-
-**Conversão:**
-```typescript
-function converterItensDevolucao(itens: ItemDevolucao[]): ItemDevolucaoRequest[] {
-  return itens
-    .filter(item => item.qtdDevolver > 0)
-    .map(item => ({
-      itemId: item.itemId,
-      quantidadeDevolver: item.qtdDevolver,
-    }));
-}
-```
+Ao emitir (`POST /api/notas/devolucao`), enviar apenas `{ itemId, quantidadeDevolver }` para cada item com `qtdDevolver > 0`.
 
 ### 3.9 `ItemEntrada`, `fornecedor` e `nota` — `pages/NotaEntrada.tsx`
 
-#### 3.9.1 Fornecedor
-
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `cnpj` | `string` | 14 dígitos sem formatação |
-| `razaoSocial` | `string` | Razão social completa |
-| `ie` | `string` | Inscrição Estadual - **ADICIONAR INPUT NO FORMULÁRIO** |
-| `uf` | `string` | 2 caracteres (sigla do estado) |
-
-#### 3.9.2 Dados da Nota
-
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `numero` | `string` | Número da nota do fornecedor |
-| `serie` | `string` | Padrão "1" |
-| `dataEmissao` | `string` | Formato `yyyy-MM-dd` (input type="date") |
-| `dataEntrada` | `string` | Formato `yyyy-MM-dd` (default: hoje) |
-| `chaveAcesso` | `string` | 44 dígitos (validar) |
-| `naturezaOperacao` | `string` | Default: "Compra para comercialização" |
-
-#### 3.9.3 Item de Entrada
-
-| Campo | Tipo TS | Observação |
-|---|---|---|
-| `id` | `string?` | Temporário (Date.now()) - não enviar ao backend |
-| `codigo` | `string` | SKU do produto |
-| `descricao` | `string` | Nome/descrição do produto |
-| `ncm` | `string` | NCM sem formatação |
-| `quantidade` | `number` | Quantidade recebida |
-| `valorUnitario` | `number` | Valor unitário |
-| `cfop` | `string` | CFOP da operação (ex: "1102") |
-
-**CFOPs Válidos:**
-```typescript
-const cfopOpcoes = [
-  "1102", // Compra para comercialização
-  "1202", // Devolução de venda
-  "1403", // Compra para imobilizado
-  "1411", // Compra para industrialização
-  "2102", // Compra interestadual
-  "2202"  // Devolução interestadual
-];
-```
-
-#### 3.9.4 Payload para API
-
-**Endpoint:** `POST /api/entrada`
-
-```json
-{
-  "fornecedor": {
-    "cnpj": "12345678901234",
-    "razaoSocial": "Fornecedor ABC LTDA",
-    "ie": "123456789",
-    "uf": "SP"
-  },
-  "nota": {
-    "numero": "12345",
-    "serie": "1",
-    "dataEmissao": "2024-09-20",
-    "dataEntrada": "2024-09-21",
-    "chaveAcesso": "35240912345678901234550010001234501234567890",
-    "naturezaOperacao": "Compra para comercialização"
-  },
-  "itens": [
-    {
-      "codigo": "PF-001",
-      "descricao": "Pastilha de Freio",
-      "ncm": "87083010",
-      "quantidade": 100,
-      "valorUnitario": 45.50,
-      "cfop": "1102"
-    }
-  ]
+```ts
+interface ItemEntrada {
+  // NÃO enviar 'id' temporário (Date.now()) para o back
+  codigo: string; descricao: string; ncm: string;
+  quantidade: number; valorUnitario: number;
+  cfop: string;  // "1102" | "1202" | "1403" | "1411" | "2102" | "2202"
 }
 ```
 
-**Conversão:**
-```typescript
-// Remover campo 'id' temporário dos itens ao enviar
-const payload = {
-  fornecedor: fornecedorData,
-  nota: notaData,
-  itens: itens.map(({ id, ...item }) => item), // Remove 'id'
-};
-```
+Fornecedor: `{ cnpj, razaoSocial, ie, uf }`. Campo `ie` **não tem input na tela — adicionar**.
 
-#### 3.9.5 Importação de XML
+Nota: `{ numero, serie, dataEmissao, dataEntrada, chaveAcesso, naturezaOperacao }`. Datas em `yyyy-MM-dd` (input type="date").
 
-**Endpoint:** `POST /api/entrada/importar-xml`  
-**Content-Type:** `multipart/form-data`
-
-```typescript
-async function importarXML(file: File) {
-  const formData = new FormData();
-  formData.append('file', file);
-  
-  const response = await fetch('/api/entrada/importar-xml', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-    body: formData,
-  });
-  
-  return response.json();
-}
-```
-
-**IMPORTANTE:** Implementar handler para o input file que **atualmente não tem função**.
+Botão importar XML **não tem handler** — implementar upload multipart para `POST /api/entrada/importar-xml`.
 
 ### 3.10 Usuário autenticado — `context/AuthContext.tsx`
 
-```typescript
-interface Usuario {
-  id: string;        // UUID
-  nome: string;
-  email: string;
-  papel?: string;    // Backend retorna mas frontend não usa ainda (futuro RBAC)
-}
-
+```ts
 interface AuthContextType {
   isAuthenticated: boolean;
-  carregando: boolean;  // true durante validação do token
-  user: Usuario | null;
+  carregando: boolean;  // validando token em /auth/me
+  user: Usuario | null; // { id: string, nome, email }
   login: (email: string, senha: string) => Promise<boolean>;
   logout: () => void;
 }
 ```
 
-#### 3.10.1 Login
+Token em `sessionStorage["wc_token"]`. Usuário **não** persistido; carregado via `GET /api/auth/me` ao abrir página.
 
-**Endpoint:** `POST /api/auth/login`
+### 3.11 Dados dos cards do Home
 
-**Request:**
-```json
-{
-  "email": "admin@wcautopecas.com.br",
-  "senha": "senha123"
-}
-```
+| Componente | Mock original | Integração |
+|---|---|---|
+| `EstoqueCard` | `{ id, nome, ncm, quantidade, critico: boolean }` | `GET /api/produtos?status=critico&limit=5` |
+| `FiscalCard` | `{ id, numero, cliente, valor: string, hora }` | `GET /api/notas?de={hoje}&limit=4`; `valor` vem como number |
+| `VendasCard` | Só busca por CNPJ | Buscar `GET /api/clientes?documento=` e navegar para PDV |
 
-**Response:**
-```json
-{
-  "token": "eyJhbGciOiJIUzUxMiJ9...",
-  "refreshToken": "eyJhbGciOiJIUzUxMiJ9...",
-  "usuario": {
-    "id": "uuid",
-    "nome": "Administrador",
-    "email": "admin@wcautopecas.com.br",
-    "papel": "ADMIN"
-  },
-  "expiresIn": 28800
-}
-```
-
-**Persistência:**
-- Token: `sessionStorage['wc_token']` ✅
-- **NÃO** usar `localStorage` ✅
-- Usuário: **NÃO persistir** - buscar via `GET /auth/me` ao carregar página ✅
-
-#### 3.10.2 Validação de Sessão
-
-**Endpoint:** `GET /api/auth/me`  
-**Headers:** `Authorization: Bearer {token}`
-
-**Response:**
-```json
-{
-  "id": "uuid",
-  "nome": "Administrador",
-  "email": "admin@wcautopecas.com.br",
-  "papel": "ADMIN"
-}
-```
-
-**Comportamento:**
-- Se retornar 401: Limpar token e redirecionar para `/login`
-- Executar ao carregar aplicação (antes de renderizar telas autenticadas)
-
-#### 3.10.3 Logout
-
-**Endpoint:** `POST /api/auth/logout`  
-**Headers:** `Authorization: Bearer {token}`
-
-**Efeitos:**
-- Remover `sessionStorage['wc_token']`
-- Invalidar sessão no backend
-- Redirecionar para `/login`
-
-### 3.11 Dashboard e Cards do Home
-
-#### 3.11.1 Dados Agregados do Dashboard
-
-**Endpoint:** `GET /api/dashboard`
-
-**Response:**
-```json
-{
-  "vendas": {
-    "hoje": 15,
-    "valorHoje": 12500.00,
-    "mes": 450,
-    "valorMes": 250000.00,
-    "ticketMedio": 833.33
-  },
-  "estoque": {
-    "totalProdutos": 847,
-    "produtosBaixo": 23,
-    "produtosCriticos": 8,
-    "valorTotalEstoque": 145890.00
-  },
-  "fiscal": {
-    "emitidasHoje": 12,
-    "autorizadas": 10,
-    "processando": 2,
-    "rejeitadas": 0,
-    "valorHoje": 15000.00
-  },
-  "clientes": {
-    "total": 320,
-    "ativos": 305,
-    "novosNoMes": 12
-  }
-}
-```
-
-**Cache:** 5 minutos no Redis
-
-#### 3.11.2 EstoqueCard - Produtos Críticos
-
-**Endpoint sugerido:** `GET /api/produtos?status=critico&limit=5`
-
-**Estrutura:**
-```typescript
-interface ProdutoCritico {
-  id: string;
-  nome: string;
-  codigo: string;
-  ncm: string;
-  estoque: {
-    estoqueAtual: number;
-    estoqueMinimo: number;
-    status: "critico";
-  };
-}
-```
-
-**Adaptação:**
-- Mapear `estoque.status === "critico"` para `critico: true` (compatibilidade)
-- Mapear `estoque.estoqueAtual` para `quantidade`
-
-#### 3.11.3 FiscalCard - Notas do Dia
-
-**Endpoint sugerido:** `GET /api/notas?de={hoje}&limit=4`
-
-**Estrutura:**
-```typescript
-interface NotaDoDia {
-  id: string;
-  numero: string;
-  cliente: string;      // Nome ou "Consumidor Final"
-  valorTotal: number;   // Formatar no frontend
-  emitidaEm: string;    // ISO 8601 - extrair apenas hora
-}
-```
-
-**Formatação:**
-- `valorTotal`: Formatar com `Intl.NumberFormat` → `"R$ 1.250,00"`
-- `emitidaEm`: Extrair apenas hora (`HH:mm`)
-
-#### 3.11.4 VendasCard - Busca de Cliente
-
-**Funcionalidade:** Buscar cliente por CNPJ e navegar para PDV
-
-**Endpoint:** `GET /api/clientes?documento={cnpj}`
-
-**Implementação necessária:**
-```typescript
-async function buscarClientePorCNPJ(cnpj: string) {
-  const cnpjLimpo = limparDocumento(cnpj);
-  const response = await fetch(`/api/clientes?documento=${cnpjLimpo}`);
-  const data = await response.json();
-  
-  if (data.items.length > 0) {
-    // Navegar para PDV com cliente pré-selecionado
-    navigate('/pdv', { state: { cliente: data.items[0] } });
-  } else {
-    alert('Cliente não encontrado');
-  }
-}
-```
+Dashboard completo: `GET /api/dashboard` retorna estatísticas de vendas, estoque, fiscal e clientes.
 
 ---
 
@@ -1184,19 +589,29 @@ Hierarquia autenticada: `Layout` → (`Sidebar`, `MobileHeader`, `<Outlet/>` com
    - `GET /api/notas/{id}/itens` (se não existir)
    - Necessário para devolução
 
-### 7.3 🎯 Resumo de Compatibilidade Após Correções
+## 7. Inconsistências corrigidas
 
-| Módulo | Antes | Depois | Status |
-|--------|-------|--------|--------|
-| Autenticação | 95% | 100% | ✅ Compatível |
-| Clientes | 30% | 85% | ⚠️ Falta implementar handlers |
-| Produtos | 25% | 85% | ⚠️ Falta implementar handlers |
-| Vendas/PDV | 35% | 75% | ⚠️ Falta gestão de cliente |
-| Fiscal | 60% | 90% | ⚠️ Falta campo CNPJ na listagem |
-| Entrada | 50% | 85% | ⚠️ Falta campo IE e upload |
-| Dashboard | 40% | 90% | ⚠️ Falta lista de críticos |
+O documento original tinha incompatibilidades entre frontend e backend. **Principais correções feitas:**
 
-**Compatibilidade Geral:** 45% → **87%** 🎉
+1. **IDs:** `number` → `string` (UUID) em todas as entidades
+2. **Formatação:** Documento, telefone, NCM sem formatação no modelo; formatar só na exibição
+3. **Datas:** Backend usa ISO 8601; converter para `dd/MM/yyyy` na UI
+4. **Cliente:** Adicionados campos obrigatórios (`nomeFantasia`, `inscricaoEstadual`, endereço)
+5. **Produto:** `estoque` agora é objeto; status calculado no backend
+6. **Venda:** Back espera `clienteId` (UUID), não campos soltos de CPF/nome
+7. **ItemCarrinho:** Back espera `produtoId`, não `codigo`
+8. **Devolução:** Itens precisam de `itemId` da nota original
+9. **Inutilização:** `numeroInicial`/`numeroFinal` são `number`, converter strings
+10. **Status:** `ativo: boolean` no back; mapear para `"ativo"`/`"inativo"` se necessário
+
+**Paginação:** Back retorna `{items: [], lastKey?: string, count: number}`; front deve implementar.
+
+**Formatação consistente:**
+- `formatarDocumento(doc, tipo)` — CPF/CNPJ
+- `formatarTelefone(tel)` — (11) 98765-4321
+- `formatarNCM(ncm)` — 8708.30.10
+- `formatarDataBR(iso)` — dd/MM/yyyy
+- `limparDocumento(doc)` — remove formatação ao enviar
 
 ---
 
