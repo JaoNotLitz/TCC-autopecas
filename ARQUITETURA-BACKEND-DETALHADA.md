@@ -57,7 +57,7 @@ O sistema WC Autopeças é uma plataforma completa de gestão para lojas de auto
 ┌─────────────────────────────────────────────────────────────────┐
 │                  AWS API GATEWAY (REST API)                      │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ • Cognito JWT Authorizer                                  │  │
+│  │ • Lambda Authorizer (JWT do Auth Service)                 │  │
 │  │ • Rate Limiting: 1000 req/s                               │  │
 │  │ • Request/Response Validation                             │  │
 │  │ • CORS Configuration                                      │  │
@@ -326,7 +326,7 @@ O sistema WC Autopeças é uma plataforma completa de gestão para lojas de auto
 **Tipo:** HTTP API (REST API alternativo)
 
 **Features:**
-- **Authorizer:** JWT via Cognito User Pools
+- **Authorizer:** Lambda Authorizer que valida o JWT emitido pelo Auth Service
 - **Rate Limiting:** 1000 req/s por conta, 100 req/s por IP
 - **CORS:** Configurado para domínio do frontend
 - **Request Validation:** Schema validation para payloads
@@ -339,12 +339,14 @@ O sistema WC Autopeças é uma plataforma completa de gestão para lojas de auto
 
 **Authorizer Configuration:**
 ```yaml
-Type: JWT
+Type: REQUEST (Lambda Authorizer)
 Identity Source: $request.header.Authorization
-Issuer: https://cognito-idp.us-east-1.amazonaws.com/{userPoolId}
-Audience: {clientId}
-Token validation: Automatic
+Validação: assinatura HS512 com a chave wc-jwt-secret (Secrets Manager) + expiração
+Rotas públicas (sem authorizer): POST /api/auth/login, POST /api/auth/refresh
+Contexto repassado aos serviços: usuarioId, papel
 ```
+
+> O token é emitido pelo próprio Auth Service (não há Cognito). O authorizer só confere assinatura e expiração; a checagem de sessão no Redis (logout/blacklist) continua no Auth Service via `GET /api/auth/me` e no filtro de segurança de cada serviço.
 
 ### 3.4 Amazon DynamoDB
 
@@ -471,8 +473,7 @@ lock:{resource}                           → Distributed lock
 #### **Dependências:**
 - **DynamoDB:** Tabela `users`
 - **Redis:** Session store
-- **AWS Cognito:** Geração e validação de JWT
-- **Secrets Manager:** Chave JWT
+- **Secrets Manager:** Chave JWT (`wc-jwt-secret`), usada para assinar e validar os tokens (HS512)
 
 #### **Integrações:**
 - **Inbound:** API Gateway (HTTPS)
@@ -918,6 +919,44 @@ Qual seção quer ver agora? 🎯
 
 ## 5. APIs e Endpoints
 
+### 5.0 Convenções gerais (valem para todos os serviços)
+
+**IDs:** UUID em `string`.
+
+**Datas:** ISO 8601 (`2024-09-20T15:00:00Z`); datas sem hora em `yyyy-MM-dd`.
+
+**Documento, telefone, CEP e NCM:** só dígitos, sem máscara.
+
+**Enums:** `tipoDocumento` da venda é minúsculo (`nfe|nfce`); `tipo` da nota fiscal é maiúsculo (`NFE|NFCE|DEVOLUCAO|ENTRADA`). Os demais enums (status, método de pagamento etc.) são minúsculos.
+
+**Listagens:** todo `GET` de coleção aceita `limit` (default 20, max 100) e `lastKey` (cursor) e responde no mesmo envelope:
+```json
+{
+  "items": [ ... ],
+  "lastKey": "base64-encoded-key",
+  "count": 20
+}
+```
+- `count` é a quantidade de itens **desta página**, não o total da coleção (DynamoDB não fornece total barato). Totais vêm do `GET /api/dashboard` ou de `/resumo`.
+- `lastKey` ausente ou `null` indica a última página.
+
+**Formato de erro** (todo status 4xx/5xx):
+```json
+{
+  "status": 409,
+  "erro": "CONFLICT",
+  "message": "Documento já cadastrado",
+  "campos": [
+    { "campo": "documento", "message": "Já existe cliente com este documento" }
+  ]
+}
+```
+- `message` é sempre presente e pode ser exibida ao usuário.
+- `campos` aparece só em erros de validação (`400`/`422`).
+- `401` = token ausente, inválido ou expirado; `403` = usuário autenticado sem permissão para a operação (papel insuficiente).
+
+---
+
 ### 5.1 Auth Service (Port 8080)
 
 **Base Path:** `/api/auth`
@@ -1062,6 +1101,7 @@ Authorization: Bearer {token}
 - `cidade` (opcional): Filtro por cidade
 - `uf` (opcional): Filtro por UF
 - `ativo` (opcional): `true` ou `false`
+- `documento` (opcional): CPF/CNPJ exato, só dígitos (consulta direta no GSI de documento; retorna 0 ou 1 item)
 - `limit` (opcional): Número de resultados (default: 20, max: 100)
 - `lastKey` (opcional): Cursor para paginação
 
@@ -1090,6 +1130,7 @@ Authorization: Bearer {token}
 ```
 
 **Comportamento:**
+- Se `documento` for informado: query exata no GSI de documento (usado pelo PDV para localizar o cliente)
 - Se `busca` contém apenas números: busca por documento (GSI)
 - Caso contrário: scan com filtro em nome e email
 - Cache de 5 minutos para queries comuns
@@ -1166,18 +1207,21 @@ Authorization: Bearer {token}
 }
 ```
 
-**Validações:**
+**Campos obrigatórios:** `tipo`, `documento`, `nome`.
+**Opcionais:** `nomeFantasia`, `email`, `telefone`, `inscricaoEstadual` e todo o endereço (`cep`, `logradouro`, `numero`, `complemento`, `bairro`, `cidade`, `uf`). Isso permite o cadastro rápido no PDV (NFC-e). O endereço completo passa a ser exigido na emissão de NF-e (ver `POST /api/vendas`).
+
+**Validações (quando o campo for informado):**
 - CPF/CNPJ válido conforme algoritmo
 - Documento único (não pode existir outro cliente com mesmo documento)
 - Email único
 - Telefone: 10 ou 11 dígitos
 - CEP: 8 dígitos
-- UF: 2 caracteres
-- Nome fantasia obrigatório para PJ
+- UF: uma das 27 siglas válidas
+- Se `nomeFantasia` não for informado para PJ, assume o valor de `nome`
 
 **Efeitos Colaterais:**
 - Publica evento `customer.created` na fila `customer-events-queue`
-- Email de boas-vindas enviado (via Notification Service)
+- Email de boas-vindas enviado (via Notification Service), apenas se `email` foi informado
 
 **Erros:**
 - `400 Bad Request`: Dados inválidos
@@ -1232,6 +1276,7 @@ Authorization: Bearer {token}
 - `status` (opcional): `ok|atencao|baixo|critico`
 - `ativo` (opcional): `true|false`
 - `limit` (opcional): Default 20, max 100
+- `lastKey` (opcional): Cursor para paginação
 
 **Response (200 OK):**
 ```json
@@ -1245,16 +1290,22 @@ Authorization: Bearer {token}
       "categoria": "Freios",
       "precoCusto": 45.50,
       "precoVenda": 89.90,
-      "estoqueAtual": 45,
       "estoqueMinimo": 15,
-      "disponivel": 40,
-      "reservado": 5,
-      "status": "ok",
-      "ativo": true
+      "ativo": true,
+      "estoque": {
+        "estoqueAtual": 45,
+        "reservado": 5,
+        "disponivel": 40,
+        "status": "ok"
+      }
     }
-  ]
+  ],
+  "lastKey": "base64-encoded-key",
+  "count": 20
 }
 ```
+
+> O estoque vem sempre no objeto `estoque`, na listagem e no detalhe.
 
 **Cache:** Produtos mais consultados (1 hora)
 
@@ -1314,20 +1365,23 @@ Authorization: Bearer {token}
   "cfop": "5102",
   "origem": "0",
   "cstIcms": "00",
-  "aliquotaIcms": 18.00
+  "aliquotaIcms": 18.00,
+  "estoqueInicial": 30
 }
 ```
 
-**Response (201 Created):** Produto criado
+**Response (201 Created):** Produto criado (mesmo formato de `GET /api/produtos/{id}`)
 
 **Validações:**
 - Código único
 - NCM: 8 dígitos
 - Preço venda > preço custo
 - Estoque mínimo >= 0
+- `estoqueInicial` (opcional) >= 0
 
 **Efeitos Colaterais:**
-- Cria registro em `inventory` com estoque inicial 0
+- Cria registro em `inventory` com `estoqueInicial` (ou 0 se omitido)
+- Se `estoqueInicial` > 0: registra movimentação tipo `ajuste` com motivo "Estoque inicial"
 
 **Erros:**
 - `409 Conflict`: Código já existe
@@ -1336,6 +1390,10 @@ Authorization: Bearer {token}
 
 #### **PUT /api/produtos/{id}**
 **Função:** Atualizar produto
+
+**Request:** Igual ao POST, sem `estoqueInicial`. Este endpoint **não altera a quantidade em estoque**; para isso use `POST /api/produtos/{id}/ajuste`, que exige motivo e registra a movimentação.
+
+**Response (200 OK):** Produto atualizado (mesmo formato de `GET /api/produtos/{id}`)
 
 **Efeitos Colaterais:**
 - Invalida cache Redis
@@ -1350,6 +1408,10 @@ Authorization: Bearer {token}
 
 **Regras:**
 - Não pode desativar se houver estoque reservado
+
+**Erros:**
+- `404 Not Found`: Produto não existe
+- `409 Conflict`: Produto com estoque reservado
 
 ---
 
@@ -1380,6 +1442,7 @@ Authorization: Bearer {token}
 - `ate` (opcional): Data final
 - `tipo` (opcional): `entrada|saida|ajuste|reserva|liberacao`
 - `limit` (opcional): Default 50
+- `lastKey` (opcional): Cursor para paginação
 
 **Response (200 OK):**
 ```json
@@ -1470,7 +1533,7 @@ Authorization: Bearer {token}
 ```
 
 **Validações:**
-- NF-e exige `clienteId`
+- NF-e exige `clienteId`, e o cliente precisa ter endereço completo (`cep`, `logradouro`, `numero`, `bairro`, `cidade`, `uf`); caso contrário `422` com os campos faltantes em `campos`
 - NFC-e permite `clienteId` null
 - Pelo menos 1 item
 - Verificar estoque disponível para cada item
@@ -1486,6 +1549,7 @@ Authorization: Bearer {token}
 **Erros:**
 - `400 Bad Request`: Dados inválidos
 - `409 Conflict`: Estoque insuficiente para algum item
+- `422 Unprocessable Entity`: NF-e para cliente sem endereço completo
 
 ---
 
@@ -1539,8 +1603,9 @@ Authorization: Bearer {token}
 - `de` (opcional): Data inicial
 - `ate` (opcional): Data final
 - `limit` (opcional)
+- `lastKey` (opcional): Cursor para paginação
 
-**Response (200 OK):** Array de vendas
+**Response (200 OK):** Envelope padrão (`{items, lastKey, count}`) com vendas no formato resumido (sem `itens`)
 
 ---
 
@@ -1593,6 +1658,7 @@ Authorization: Bearer {token}
 - `ate` (opcional): Data final
 - `clienteId` (opcional)
 - `limit` (opcional)
+- `lastKey` (opcional): Cursor para paginação
 
 **Response (200 OK):**
 ```json
@@ -1610,7 +1676,9 @@ Authorization: Bearer {token}
       "protocolo": "135240000012345",
       "cliente": "João Silva"
     }
-  ]
+  ],
+  "lastKey": "base64-encoded-key",
+  "count": 20
 }
 ```
 
@@ -1643,9 +1711,58 @@ Authorization: Bearer {token}
   "tentativasEnvio": 1,
   "xmlPath": "s3://wc-documents-bucket/NFCE/2024/09/35240912...xml",
   "pdfPath": "s3://wc-documents-bucket/NFCE/2024/09/35240912...pdf",
-  "itens": [...]
+  "itens": [
+    {
+      "itemId": "uuid",
+      "produtoId": "uuid",
+      "codigo": "PF-001",
+      "descricao": "Pastilha de Freio Dianteira",
+      "ncm": "87083010",
+      "cfop": "5102",
+      "quantidade": 2,
+      "valorUnitario": 89.90,
+      "valorTotal": 179.80,
+      "quantidadeDevolvida": 0
+    }
+  ]
 }
 ```
+
+**Erros:**
+- `404 Not Found`: Nota não existe
+
+---
+
+#### **GET /api/notas/{id}/itens**
+**Função:** Listar os itens da nota (usado pela tela de devolução)
+
+**Response (200 OK):**
+```json
+{
+  "items": [
+    {
+      "itemId": "uuid",
+      "produtoId": "uuid",
+      "codigo": "PF-001",
+      "descricao": "Pastilha de Freio Dianteira",
+      "ncm": "87083010",
+      "cfop": "5102",
+      "quantidade": 2,
+      "valorUnitario": 89.90,
+      "valorTotal": 179.80,
+      "quantidadeDevolvida": 0
+    }
+  ],
+  "lastKey": null,
+  "count": 1
+}
+```
+
+- `itemId` identifica o item **nesta nota** e é o valor esperado em `POST /api/notas/devolucao`.
+- `quantidadeDevolvida` soma devoluções já autorizadas; o máximo a devolver é `quantidade - quantidadeDevolvida`.
+
+**Erros:**
+- `404 Not Found`: Nota não existe
 
 ---
 
@@ -1760,8 +1877,8 @@ Authorization: Bearer {token}
 
 **Validações:**
 - Nota referenciada deve estar `autorizada`
-- Itens devem pertencer à nota original
-- `quantidadeDevolver` <= quantidade original
+- `itemId` deve ser um item da nota referenciada (obtido em `GET /api/notas/{id}/itens`)
+- `quantidadeDevolver` <= `quantidade - quantidadeDevolvida` do item
 - Pelo menos 1 item com quantidade > 0
 
 **Efeitos Colaterais:**
@@ -1863,6 +1980,37 @@ file: arquivo.xml (max 5MB)
 
 ---
 
+#### **POST /api/entrada/importar-xml/previa**
+**Função:** Ler o XML e devolver os dados da entrada **sem registrar nada**, para o usuário conferir e confirmar na tela
+
+**Request:** `multipart/form-data`
+```
+file: arquivo.xml (max 5MB)
+```
+
+**Response (200 OK):** mesmo formato do corpo de `POST /api/entrada`
+```json
+{
+  "fornecedor": { "cnpj": "...", "razaoSocial": "...", "ie": "...", "uf": "SP" },
+  "nota": { "numero": "...", "serie": "...", "dataEmissao": "2024-09-20", "dataEntrada": null, "chaveAcesso": "...", "naturezaOperacao": "..." },
+  "itens": [ { "codigo": "...", "descricao": "...", "ncm": "...", "quantidade": 100, "valorUnitario": 45.50, "cfop": "1102" } ]
+}
+```
+
+**Processo:**
+1. Valida e faz o parse do XML de forma síncrona
+2. Não grava no S3, não publica evento e não altera estoque
+3. O front exibe os dados, o usuário completa/ajusta (ex.: `dataEntrada`) e confirma via `POST /api/entrada`
+
+**Erros:**
+- `400 Bad Request`: XML inválido ou não é NF-e
+- `409 Conflict`: Chave de acesso já registrada como entrada
+- `413 Payload Too Large`: Arquivo > 5MB
+
+> `POST /api/entrada/importar-xml` (assíncrono, registro direto) continua disponível para importação em lote sem conferência.
+
+---
+
 #### **GET /api/entrada**
 **Função:** Listar notas de entrada
 
@@ -1871,8 +2019,9 @@ file: arquivo.xml (max 5MB)
 - `de` (opcional)
 - `ate` (opcional)
 - `limit` (opcional)
+- `lastKey` (opcional): Cursor para paginação
 
-**Response (200 OK):** Array de entradas
+**Response (200 OK):** Envelope padrão (`{items, lastKey, count}`) com entradas no formato resumido (sem `itens`)
 
 ---
 

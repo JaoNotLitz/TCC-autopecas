@@ -86,16 +86,16 @@ Todos os tipos abaixo estão declarados **localmente dentro de cada página** (n
 | `tipo` | `"PF" \| "PJ"` | |
 | `documento` | `string` | Sem formatação (`12345678901234`); formatar só na exibição |
 | `nome` | `string` | |
-| `nomeFantasia` | `string?` | Obrigatório para PJ |
-| `email` | `string` | |
-| `telefone` | `string` | Sem formatação (`11987654321`) |
-| `cep` | `string` | |
-| `logradouro` | `string` | |
-| `numero` | `string` | |
+| `nomeFantasia` | `string?` | Opcional; para PJ o back assume `nome` se omitido |
+| `email` | `string?` | |
+| `telefone` | `string?` | Sem formatação (`11987654321`) |
+| `cep` | `string?` | Endereço opcional no cadastro (permite cadastro rápido no PDV) |
+| `logradouro` | `string?` | |
+| `numero` | `string?` | |
 | `complemento` | `string?` | |
-| `bairro` | `string` | |
-| `cidade` | `string` | |
-| `uf` | `string` | |
+| `bairro` | `string?` | |
+| `cidade` | `string?` | |
+| `uf` | `string?` | |
 | `inscricaoEstadual` | `string?` | Para PJ |
 | `ativo` | `boolean` | Back usa boolean; mapear para `"ativo"`/`"inativo"` se necessário |
 | `totalCompras` | `number` | |
@@ -103,6 +103,8 @@ Todos os tipos abaixo estão declarados **localmente dentro de cada página** (n
 | `ultimaCompra` | `string` | ISO 8601; converter para `dd/MM/yyyy` na exibição |
 
 Origem: `GET /api/clientes` (retorna `{items: Cliente[], lastKey?: string, count: number}` para paginação).
+
+Endereço completo (`cep`, `logradouro`, `numero`, `bairro`, `cidade`, `uf`) só é exigido para emitir **NF-e**: o `POST /api/vendas` responde `422` com os campos faltantes em `campos`, e o front deve pedir o complemento do cadastro.
 
 ### 3.2 `Produto` — `pages/Estoque.tsx:4`
 
@@ -119,7 +121,7 @@ Origem: `GET /api/clientes` (retorna `{items: Cliente[], lastKey?: string, count
 | `ativo` | `boolean` | |
 | `estoque` | objeto | `{ estoqueAtual, reservado, disponivel, status, ultimaMovimentacao }` |
 
-Back retorna **objeto aninhado** para estoque. Status (`ok`/`atencao`/`baixo`/`critico`) já calculado no back — **não recalcular no front**.
+Back retorna **objeto aninhado** para estoque, tanto na listagem quanto no detalhe. Status (`ok`/`atencao`/`baixo`/`critico`) já calculado no back — **não recalcular no front**.
 
 Mapeamento para código legado:
 - `estoque` (number) = `estoque.estoqueAtual`
@@ -129,6 +131,8 @@ Mapeamento para código legado:
 - `status` = `estoque.status`
 
 Origem: `GET /api/produtos`.
+
+Quantidade em estoque: no cadastro, enviar `estoqueInicial` no `POST /api/produtos`. Na edição, o `PUT` **não** altera estoque; usar `POST /api/produtos/{id}/ajuste` com `{ quantidadeNova, motivo }` (motivo ≥ 10 caracteres), então a tela de edição precisa de um campo de motivo quando a quantidade mudar.
 
 ### 3.3 `ItemCarrinho` — `pages/PDV.tsx:20`
 
@@ -219,7 +223,7 @@ interface ItemDevolucao {
 }
 ```
 
-Back precisa de endpoint `GET /api/notas/{id}/itens` para retornar itens com `itemId`.
+Itens vêm de `GET /api/notas/{id}/itens` (com `itemId`, `quantidade` e `quantidadeDevolvida`). `qtdOriginal` = `quantidade - quantidadeDevolvida`.
 
 Ao emitir (`POST /api/notas/devolucao`), enviar apenas `{ itemId, quantidadeDevolver }` para cada item com `qtdDevolver > 0`.
 
@@ -238,7 +242,7 @@ Fornecedor: `{ cnpj, razaoSocial, ie, uf }`. Campo `ie` **não tem input na tela
 
 Nota: `{ numero, serie, dataEmissao, dataEntrada, chaveAcesso, naturezaOperacao }`. Datas em `yyyy-MM-dd` (input type="date").
 
-Botão importar XML **não tem handler** — implementar upload multipart para `POST /api/entrada/importar-xml`.
+Botão importar XML **não tem handler**: implementar upload multipart para `POST /api/entrada/importar-xml/previa`, que devolve `{ fornecedor, nota, itens }` sem registrar nada. O front preenche o formulário, o usuário confere e confirma com `POST /api/entrada`.
 
 ### 3.10 Usuário autenticado — `context/AuthContext.tsx`
 
@@ -266,9 +270,9 @@ Dashboard completo: `GET /api/dashboard` retorna estatísticas de vendas, estoqu
 
 ---
 
-## 4. Modelo do Backend (Contrato Real - IMPLEMENTADO)
+## 4. Modelo do Backend (contrato documentado)
 
-Este modelo reflete a **arquitetura backend real** conforme documentado em `ARQUITETURA-BACKEND-DETALHADA.md`. O frontend deve adaptar-se a estes contratos.
+Este modelo reflete o contrato descrito em `ARQUITETURA-BACKEND-DETALHADA.md` (seção 5). O back **ainda não está implementado**: este é o contrato combinado, e o front deve adaptar-se a ele. Convenções gerais (IDs, datas, paginação, formato de erro) estão na seção 5.0 da arquitetura.
 
 ### 4.1 Entidades
 
@@ -277,11 +281,11 @@ Este modelo reflete a **arquitetura backend real** conforme documentado em `ARQU
 | `Usuario` | `id`, `nome`, `email`, senha (hash), `papel` | `AuthContext.user` |
 | `Cliente` | `id`, `tipo` (PF/PJ), `documento` (só dígitos), `nome`, `email`, `telefone`, `cidade`, `uf`, `ativo` | `Cliente` |
 | `Produto` | `id`, `codigo`, `nome`, `ncm`, `estoqueAtual`, `estoqueMinimo`, `precoCusto`, `precoVenda` | `Produto`, mocks do Home |
-| `Fornecedor` | `id`, `cnpj`, `razaoSocial`, `ie`, `uf` | `fornecedor` em `NotaEntrada` |
+| `Fornecedor` | `cnpj`, `razaoSocial`, `ie`, `uf` (gravado dentro da nota de entrada; ainda não há cadastro nem endpoint próprio) | `fornecedor` em `NotaEntrada` |
 | `Venda` | `id`, `tipoDocumento`, `modalidade`, `clienteId?`, `metodoPagamento`, `bandeira?`, `destinoDinheiro?`, `desconto`, `subtotal`, `total`, `status` (`orcamento`/`finalizada`) | estado do `PDV` |
 | `VendaItem` | `vendaId`, `produtoId`, `quantidade`, `valorUnitario` | `ItemCarrinho` (sem campos de UI) |
 | `NotaFiscal` | `id`, `tipo` (`NFE`/`NFCE`/`DEVOLUCAO`/`ENTRADA`), `numero`, `serie`, `chaveAcesso`, `clienteId?`, `fornecedorId?`, `valorTotal`, `emitidaEm`, `status`, `vendaId?`, `notaReferenciadaId?` | `notasFiscais`, `NotaParaCancelar`, `notasReferencia`, `notasEmitidas` |
-| `NotaFiscalItem` | `notaId`, `produtoId`, `descricao`, `ncm`, `cfop`, `quantidade`, `valorUnitario` | `ItemDevolucao`, `ItemEntrada` |
+| `NotaFiscalItem` | `itemId`, `notaId`, `produtoId`, `codigo`, `descricao`, `ncm`, `cfop`, `quantidade`, `valorUnitario`, `valorTotal`, `quantidadeDevolvida` | `ItemDevolucao`, `ItemEntrada` |
 | `EventoFiscal` | `id`, `notaId`, `tipo` (`CANCELAMENTO`), `justificativa`, `protocolo`, `registradoEm` | fluxo de `Cancelamento` |
 | `Inutilizacao` | `id`, `serie`, `numeroInicial`, `numeroFinal`, `justificativa`, `protocolo`, `registradaEm` | `Inutilizacao` |
 
@@ -295,10 +299,12 @@ Este modelo reflete a **arquitetura backend real** conforme documentado em `ARQU
 | `MetodoPagamento` | `dinheiro`, `credito`, `debito`, `pix`, `boleto` |
 | `BandeiraCartao` | `mastercard`, `visa`, `elo`, `outros` |
 | `DestinoDinheiro` | `banco`, `cofre` |
-| `StatusNota` | `autorizada`, `cancelada`, `processando` (`inutilizada` para faixas) |
+| `StatusNota` | `processando`, `autorizada`, `rejeitada`, `cancelada` (`inutilizada` para faixas) |
+| `StatusVenda` | `orcamento`, `finalizada`, `cancelada` |
+| `TipoNota` | `NFE`, `NFCE`, `DEVOLUCAO`, `ENTRADA` (maiúsculo, diferente de `TipoDocumento` da venda) |
 | `StatusEstoque` | `ok`, `atencao`, `baixo`, `critico` (ver regra na seção 5) |
 
-### 4.3 Endpoints do Backend (Implementados)
+### 4.3 Endpoints do Backend (documentados)
 
 #### 4.3.1 Autenticação (Auth Service - Port 8080)
 
@@ -364,7 +370,8 @@ Este modelo reflete a **arquitetura backend real** conforme documentado em `ARQU
 | Listar | GET | `/api/entrada` | - | - |
 | Buscar | GET | `/api/entrada/{id}` | - | - |
 | Registrar | POST | `/api/entrada` | `application/json` | `{ fornecedor, nota, itens[] }` |
-| Importar XML | POST | `/api/entrada/importar-xml` | `multipart/form-data` | `file=arquivo.xml` |
+| Prévia do XML | POST | `/api/entrada/importar-xml/previa` | `multipart/form-data` | `file=arquivo.xml` → `{ fornecedor, nota, itens[] }` sem registrar |
+| Importar XML (lote, registro direto) | POST | `/api/entrada/importar-xml` | `multipart/form-data` | `file=arquivo.xml` |
 
 #### 4.3.7 Documentos (Document Service - Port 8086)
 
@@ -487,9 +494,9 @@ Hierarquia autenticada: `Layout` → (`Sidebar`, `MobileHeader`, `<Outlet/>` com
 #### 7.1.6 Campos Adicionados
 
 **Cliente:**
-- `nomeFantasia` (obrigatório para PJ)
+- `nomeFantasia` (opcional; o back assume `nome` para PJ)
 - `inscricaoEstadual` (para PJ)
-- Endereço completo: `cep`, `logradouro`, `numero`, `complemento`, `bairro`
+- Endereço: `cep`, `logradouro`, `numero`, `complemento`, `bairro` (opcionais no cadastro, exigidos para NF-e)
 - `dataCriacao`, `dataAtualizacao`
 - `valorTotalCompras`
 
@@ -529,7 +536,7 @@ Hierarquia autenticada: `Layout` → (`Sidebar`, `MobileHeader`, `<Outlet/>` com
 #### 7.1.9 Estrutura de Devolução Corrigida
 
 **ItemDevolucao:** Adicionado `itemId` (UUID do item na nota original)
-- Backend deve fornecer endpoint: `GET /api/notas/{id}/itens`
+- Endpoint: `GET /api/notas/{id}/itens`
 - Payload: `{ itemId, quantidadeDevolver }`
 
 #### 7.1.10 Nota de Entrada
@@ -585,9 +592,10 @@ Hierarquia autenticada: `Layout` → (`Sidebar`, `MobileHeader`, `<Outlet/>` com
    - Retornar lista de produtos críticos (não apenas contagem)
    - Facilita exibição no EstoqueCard
 
-3. **Endpoint de Itens:**
-   - `GET /api/notas/{id}/itens` (se não existir)
-   - Necessário para devolução
+3. **Ainda sem endpoint no back** (decisão de produto pendente):
+   - CRUD de fornecedores
+   - CRUD de usuários e grupos de acesso / matriz de permissões (hoje só existe `papel`)
+   - Histórico de inutilizações (`GET`)
 
 ## 7. Inconsistências corrigidas
 
@@ -596,7 +604,7 @@ O documento original tinha incompatibilidades entre frontend e backend. **Princi
 1. **IDs:** `number` → `string` (UUID) em todas as entidades
 2. **Formatação:** Documento, telefone, NCM sem formatação no modelo; formatar só na exibição
 3. **Datas:** Backend usa ISO 8601; converter para `dd/MM/yyyy` na UI
-4. **Cliente:** Adicionados campos obrigatórios (`nomeFantasia`, `inscricaoEstadual`, endereço)
+4. **Cliente:** Adicionados `nomeFantasia`, `inscricaoEstadual` e endereço (opcionais no cadastro; endereço exigido para NF-e)
 5. **Produto:** `estoque` agora é objeto; status calculado no backend
 6. **Venda:** Back espera `clienteId` (UUID), não campos soltos de CPF/nome
 7. **ItemCarrinho:** Back espera `produtoId`, não `codigo`
@@ -1189,8 +1197,9 @@ Contratos que o back precisa respeitar para esta base funcionar:
 
 - [ ] Criar handler `handleImportarXML()`
 - [ ] FormData com arquivo
-- [ ] POST multipart para `/api/entrada/importar-xml`
-- [ ] Exibir feedback de processamento
+- [ ] POST multipart para `/api/entrada/importar-xml/previa`
+- [ ] Preencher o formulário com a resposta para o usuário conferir
+- [ ] Confirmar com `POST /api/entrada`
 - [ ] Arquivo: `NotaEntrada.tsx`
 
 #### 9.3.5 Buscar Itens de Nota para Devolução
@@ -1304,16 +1313,16 @@ export interface Cliente {
   tipo: "PF" | "PJ";
   documento: string;             // Sem formatação
   nome: string;
-  nomeFantasia?: string;         // Obrigatório para PJ
-  email: string;
-  telefone: string;              // Sem formatação
-  cep: string;
-  logradouro: string;
-  numero: string;
+  nomeFantasia?: string;         // Opcional; PJ assume `nome`
+  email?: string;
+  telefone?: string;             // Sem formatação
+  cep?: string;                  // Endereço opcional; exigido para NF-e
+  logradouro?: string;
+  numero?: string;
   complemento?: string;
-  bairro: string;
-  cidade: string;
-  uf: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
   inscricaoEstadual?: string;    // Para PJ
   ativo: boolean;                // Não mais "ativo"|"inativo"
   totalCompras: number;
@@ -1334,15 +1343,15 @@ export interface ClienteInput {
   documento: string;             // Enviar sem formatação
   nome: string;
   nomeFantasia?: string;
-  email: string;
-  telefone: string;              // Enviar sem formatação
-  cep: string;
-  logradouro: string;
-  numero: string;
+  email?: string;
+  telefone?: string;             // Enviar sem formatação
+  cep?: string;
+  logradouro?: string;
+  numero?: string;
   complemento?: string;
-  bairro: string;
-  cidade: string;
-  uf: string;
+  bairro?: string;
+  cidade?: string;
+  uf?: string;
   inscricaoEstadual?: string;
 }
 ```
@@ -1613,7 +1622,7 @@ export class ClientesComponent implements OnInit {
 **O que foi corrigido:**
 - ✅ IDs de `number` para `string` (UUID)
 - ✅ Campo `status` substituído por `ativo: boolean`
-- ✅ Campos obrigatórios adicionados (`nomeFantasia`, `inscricaoEstadual`, endereço)
+- ✅ Campos adicionados (`nomeFantasia`, `inscricaoEstadual`, endereço), opcionais no cadastro
 - ✅ Formatação de dados apenas na exibição
 - ✅ Conversão de datas ISO para dd/MM/yyyy
 - ✅ Paginação implementada (scroll infinito)
