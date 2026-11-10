@@ -1,0 +1,23 @@
+{
+  "name": "autorizacao-erro-500",
+  "priority": 2,
+  "request": {
+    "method": "POST",
+    "urlPath": "/ws/NFeAutorizacao4",
+    "bodyPatterns": [
+      {
+        "matches": "(?s).*<vNF>[0-9]+\\.50</vNF>.*"
+      }
+    ]
+  },
+  "response": {
+    "headers": {
+      "Content-Type": "application/soap+xml; charset=utf-8"
+    },
+    "transformers": [
+      "response-template"
+    ],
+    "status": 500,
+    "body": "<erro>SEFAZ indisponivel (simulado)</erro>"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "name": "evento-sem-assinatura",
+  "priority": 1,
+  "request": {
+    "method": "POST",
+    "urlPath": "/ws/NFeRecepcaoEvento4",
+    "bodyPatterns": [
+      {
+        "doesNotContain": "Signature"
+      }
+    ]
+  },
+  "response": {
+    "headers": {
+      "Content-Type": "application/soap+xml; charset=utf-8"
+    },
+    "transformers": [
+      "response-template"
+    ],
+    "status": 200,
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap12:Envelope xmlns:soap12=\"http://www.w3.org/2003/05/soap-envelope\"><soap12:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeRecepcaoEvento4\"><retEnvEvento versao=\"1.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><idLote>1</idLote><tpAmb>2</tpAmb><verAplic>WC-SEFAZ-MOCK</verAplic><cOrgao>35</cOrgao><cStat>297</cStat><xMotivo>Rejeicao: Assinatura difere do padrao do Sistema</xMotivo></retEnvEvento></nfeResultMsg></soap12:Body></soap12:Envelope>"
+  }
+}

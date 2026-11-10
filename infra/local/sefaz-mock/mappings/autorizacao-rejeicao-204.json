@@ -1,0 +1,23 @@
+{
+  "name": "autorizacao-rejeicao-204",
+  "priority": 2,
+  "request": {
+    "method": "POST",
+    "urlPath": "/ws/NFeAutorizacao4",
+    "bodyPatterns": [
+      {
+        "matches": "(?s).*<vNF>[0-9]+\\.04</vNF>.*"
+      }
+    ]
+  },
+  "response": {
+    "headers": {
+      "Content-Type": "application/soap+xml; charset=utf-8"
+    },
+    "transformers": [
+      "response-template"
+    ],
+    "status": 200,
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap12:Envelope xmlns:soap12=\"http://www.w3.org/2003/05/soap-envelope\"><soap12:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeAutorizacao4\"><retEnviNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><tpAmb>2</tpAmb><verAplic>WC-SEFAZ-MOCK</verAplic><cStat>104</cStat><xMotivo>Lote processado</xMotivo><cUF>35</cUF><dhRecbto>{{now timezone='America/Sao_Paulo' format=\"yyyy-MM-dd'T'HH:mm:ssXXX\"}}</dhRecbto><protNFe versao=\"4.00\"><infProt><tpAmb>2</tpAmb><verAplic>WC-SEFAZ-MOCK</verAplic><chNFe>{{regexExtract request.body '(?<=Id=\"NFe)[0-9]{44}'}}</chNFe><dhRecbto>{{now timezone='America/Sao_Paulo' format=\"yyyy-MM-dd'T'HH:mm:ssXXX\"}}</dhRecbto><digVal>bW9jaw==</digVal><cStat>204</cStat><xMotivo>Rejeicao: Duplicidade de NF-e</xMotivo></infProt></protNFe></retEnviNFe></nfeResultMsg></soap12:Body></soap12:Envelope>"
+  }
+}

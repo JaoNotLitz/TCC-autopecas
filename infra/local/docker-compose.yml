@@ -103,6 +103,24 @@ services:
       SALES_SERVICE_URL: http://sales-service:8083
       CUSTOMER_SERVICE_URL: http://customer-service:8081
       PRODUCT_SERVICE_URL: http://product-service:8082
+      SEFAZ_URL: http://sefaz-mock:8080
+    depends_on:
+      <<: *servico-deps
+      sefaz-mock: { condition: service_healthy }
+
+  # Simulador da SEFAZ (WireMock). Os cenários estão em sefaz-mock/README.md.
+  sefaz-mock:
+    image: wiremock/wiremock:3.9.2
+    container_name: wc-sefaz-mock
+    command: ["--disable-banner"]
+    ports: ["8089:8080"]
+    volumes: ["./sefaz-mock:/home/wiremock:ro"]
+    networks: [wc-net]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/__admin/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
 
 networks:
   wc-net:

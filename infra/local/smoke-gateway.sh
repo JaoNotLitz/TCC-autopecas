@@ -54,5 +54,12 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 confere "nota ganha chave de acesso" "$(grep -cE '"chaveAcesso":"[0-9]{44}"' <<<"$nota")" 1
+# A nota vai para o simulador da SEFAZ e volta autorizada com protocolo (EPB-09).
+for _ in $(seq 1 30); do
+  nota=$(curl -s "$G/notas?vendaId=$vid" -H "$auth")
+  grep -q '"status":"autorizada"' <<<"$nota" && break
+  sleep 1
+done
+confere "SEFAZ simulada autoriza a nota" "$(grep -o '"status":"autorizada"' <<<"$nota")" '"status":"autorizada"'
 
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

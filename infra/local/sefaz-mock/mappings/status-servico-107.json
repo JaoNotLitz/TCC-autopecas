@@ -1,0 +1,18 @@
+{
+  "name": "status-servico-107",
+  "priority": 10,
+  "request": {
+    "method": "POST",
+    "urlPath": "/ws/NFeStatusServico4"
+  },
+  "response": {
+    "headers": {
+      "Content-Type": "application/soap+xml; charset=utf-8"
+    },
+    "transformers": [
+      "response-template"
+    ],
+    "status": 200,
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap12:Envelope xmlns:soap12=\"http://www.w3.org/2003/05/soap-envelope\"><soap12:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeStatusServico4\"><retConsStatServ versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><tpAmb>2</tpAmb><verAplic>WC-SEFAZ-MOCK</verAplic><cStat>107</cStat><xMotivo>Servico em Operacao</xMotivo><cUF>35</cUF><dhRecbto>{{now timezone='America/Sao_Paulo' format=\"yyyy-MM-dd'T'HH:mm:ssXXX\"}}</dhRecbto><tMed>1</tMed></retConsStatServ></nfeResultMsg></soap12:Body></soap12:Envelope>"
+  }
+}

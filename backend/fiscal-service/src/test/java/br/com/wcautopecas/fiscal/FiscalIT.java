@@ -67,6 +67,11 @@ class FiscalIT {
         InfraTeste.registrar(r);
         r.add("wc.fiscal.serie", () -> SERIE);
         r.add("wc.fiscal.visibilidade-jobs", () -> "2");
+        r.add("wc.fiscal.visibilidade-sefaz", () -> "2");
+        r.add("wc.fiscal.sefaz.url", SefazMockTeste::url);
+        r.add("wc.fiscal.sefaz.esperas-consulta", () -> "1s,1s,1s");
+        r.add("wc.fiscal.sefaz.esperas-retentativa", () -> "1s,1s");
+        r.add("wc.fiscal.sefaz.atraso-reenvio", () -> "1s");
     }
 
     @Autowired
@@ -244,18 +249,27 @@ class FiscalIT {
         assertThat(itens.get(0).get("cfop").asText()).isEqualTo("5102");
 
         verify(integracoes, atLeastOnce()).vincularNota(eq(vendaId), eq(notaId));
-        // o job generate_xml é consumido pelo FiscalProcessorListener: XML no S3 e mensagem na sefaz-queue
-        JsonNode envio = esperar("sefaz-queue", 1, m -> m.path("notaId").asLong() == notaId).get(0);
-        assertThat(envio.get("tipoNota").asText()).isEqualTo("NFCE");
-        assertThat(envio.get("tentativa").asInt()).isEqualTo(1);
+        // generate_xml → XML assinado no S3 → sefaz-queue → simulador responde 100
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(repo.porId(notaId).orElseThrow().getStatus()).isEqualTo("autorizada"));
         NotaItem gravada = repo.porId(notaId).orElseThrow();
+        assertThat(gravada.getProtocolo()).matches("135\\d{12}");
+        assertThat(gravada.getCodigoStatus()).isEqualTo("100");
+        assertThat(gravada.getAutorizadaEm()).isNotNull();
         assertThat(gravada.getChaveAcesso()).hasSize(44).contains("65" + String.format("%03d", Integer.parseInt(SERIE)));
         String caminho = gravada.getXmlPath().replace("s3://wc-documents-bucket/", "");
         assertThat(caminho).startsWith("NFCE/").endsWith(gravada.getChaveAcesso() + ".xml");
         String xml = s3.getObjectAsBytes(r -> r.bucket("wc-documents-bucket").key(caminho)).asUtf8String();
-        assertThat(xml).contains("<Signature").contains("<qrCode>");
-        assertThat(chamar(HttpMethod.GET, "/api/notas/" + notaId, null, vendedor).getBody().get("chaveAcesso").asText())
-                .isEqualTo(gravada.getChaveAcesso());
+        assertThat(xml).contains("<nfeProc").contains("<Signature").contains("<protNFe").contains("<qrCode>");
+
+        // baixa de estoque por produto da venda e aviso ao document-service
+        var baixas = esperar("inventory-updates-queue", 2, m -> m.path("referenciaId").asLong() == vendaId
+                && "decrease".equals(m.path("type").asText()));
+        assertThat(baixas).allMatch(m -> "sale".equals(m.path("referenciaType").asText()));
+        esperar("document-events-queue", 1, m -> m.path("notaId").asLong() == notaId
+                && "nota.autorizada".equals(m.path("eventType").asText()));
+        assertThat(chamar(HttpMethod.GET, "/api/notas/" + notaId, null, vendedor).getBody().get("status").asText())
+                .isEqualTo("autorizada");
     }
 
     @Test
@@ -337,7 +351,15 @@ class FiscalIT {
         assertThat(dev.get("valorTotal").decimalValue()).isEqualByComparingTo("179.80"); // 2 × 89,90 da original
         var itens = chamar(HttpMethod.GET, "/api/notas/" + dev.get("id").asLong() + "/itens", null, vendedor).getBody();
         assertThat(itens.get(0).get("cfop").asText()).isEqualTo("1202");
-        esperar("sefaz-queue", 1, m -> m.path("notaId").asLong() == dev.get("id").asLong());
+        long devId = dev.get("id").asLong();
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(repo.porId(devId).orElseThrow().getStatus()).isEqualTo("autorizada"));
+        esperar("inventory-updates-queue", 1, m -> m.path("referenciaId").asLong() == devId
+                && "increase".equals(m.path("type").asText()) && "return".equals(m.path("referenciaType").asText())
+                && m.path("quantidade").asLong() == 2);
+        NotaLinha base = repo.itens(original.getId()).get(0);
+        assertThat(base.getQuantidadeDevolvida()).isEqualTo(2);
+        assertThat(base.getQuantidadeEmDevolucao()).isZero();
 
         // vendidas 3 do produto 7 (duas linhas), 2 em devolução: sobra 1
         r = chamar(HttpMethod.POST, "/api/notas/devolucao", Map.of("notaReferenciadaId", original.getId(),
@@ -409,7 +431,8 @@ class FiscalIT {
         var r = chamar(HttpMethod.POST, "/api/notas/" + n.getId() + "/reenviar", null, vendedor);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody().get("status").asText()).isEqualTo("processando");
-        esperar("sefaz-queue", 1, m -> m.path("notaId").asLong() == n.getId());
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(repo.porId(n.getId()).orElseThrow().getStatus()).isEqualTo("autorizada"));
     }
 
     void enviarJob(long notaId) throws Exception {
@@ -418,21 +441,90 @@ class FiscalIT {
         sqs.sendMessage(r -> r.queueUrl(url).messageBody(corpo));
     }
 
-    NotaItem notaProcessando(String ncm) {
-        NotaItem n = notaAutorizada("NFCE", Instant.now());
+    /** NFC-e "processando" com um item só: o valor escolhe o cenário do simulador (,04 ,13 ,50 ,77). */
+    NotaItem notaProcessando(String ncm, String valor) {
+        long id = VENDAS.incrementAndGet();
+        NotaItem n = new NotaItem();
+        n.setId(id);
+        n.setTipo("NFCE");
+        n.setModelo("65");
+        n.setSerie(SERIE);
+        n.setNumero(String.format("%06d", id % 1_000_000));
         n.setStatus("processando");
-        n.setChaveAcesso(null);
-        n.setAutorizadaEm(null);
-        repo.salvarSeStatus(n, "autorizada");
-        NotaLinha l = linha(n.getId(), 1, 7, 2, "89.90");
+        n.setVendaId(id);
+        n.setMetodoPagamento("dinheiro");
+        n.setModalidade("fisica");
+        n.setValorProdutos(new BigDecimal(valor));
+        n.setValorDesconto(BigDecimal.ZERO);
+        n.setValorTotal(new BigDecimal(valor));
+        n.setEmitidaEm(Instant.now().toString());
+        n.setTentativasEnvio(0);
+        NotaLinha l = linha(id, 1, 7, 1, valor);
         l.setNcm(ncm);
-        repo.salvarLinha(l);
+        repo.criar(n, List.of(l), List.of());
         return n;
+    }
+
+    NotaItem esperarStatus(long id, String status) {
+        await().atMost(Duration.ofSeconds(40)).untilAsserted(() ->
+                assertThat(repo.porId(id).orElseThrow().getStatus()).isEqualTo(status));
+        return repo.porId(id).orElseThrow();
+    }
+
+    @Test
+    void rejeicaoDaSefaz() throws Exception {
+        NotaItem n = notaProcessando("87083010", "10.04");
+        enviarJob(n.getId());
+        NotaItem r = esperarStatus(n.getId(), "rejeitada");
+        assertThat(r.getCodigoStatus()).isEqualTo("204");
+        assertThat(r.getMotivoRejeicao()).contains("Duplicidade");
+        assertThat(mensagens("inventory-updates-queue")).noneMatch(m -> m.path("referenciaId").asLong() == n.getVendaId());
+        // aviso "medium" não vai para o email-queue (o filtro da assinatura só passa high/critical)
+    }
+
+    @Test
+    void loteEmProcessamentoConsultaORecibo() throws Exception {
+        NotaItem n = notaProcessando("87083010", "10.13");
+        enviarJob(n.getId());
+        NotaItem r = esperarStatus(n.getId(), "autorizada");
+        assertThat(r.getProtocolo()).isNotBlank();
+    }
+
+    @Test
+    void sefazVoltaNaSegundaTentativa() throws Exception {
+        // cenário do WireMock: 500 na primeira chamada com total ,77; depois cai no mapeamento padrão (100)
+        String cenario = "{\"scenarioName\":\"volta-" + SERIE + "\",\"requiredScenarioState\":\"Started\","
+                + "\"newScenarioState\":\"ok\",\"priority\":1,\"request\":{\"method\":\"POST\","
+                + "\"urlPath\":\"/ws/NFeAutorizacao4\",\"bodyPatterns\":[{\"matches\":\"(?s).*<vNF>[0-9]+\\\\.77</vNF>.*\"}]},"
+                + "\"response\":{\"status\":500}}";
+        var req = java.net.http.HttpRequest.newBuilder(java.net.URI.create(SefazMockTeste.url() + "/__admin/mappings"))
+                .POST(java.net.http.HttpRequest.BodyPublishers.ofString(cenario)).build();
+        assertThat(java.net.http.HttpClient.newHttpClient().send(req, java.net.http.HttpResponse.BodyHandlers.ofString())
+                .statusCode()).isEqualTo(201);
+
+        NotaItem n = notaProcessando("87083010", "10.77");
+        enviarJob(n.getId());
+        NotaItem r = esperarStatus(n.getId(), "autorizada");
+        assertThat(r.getTentativasEnvio()).isEqualTo(1);
+    }
+
+    @Test
+    void sefazForaDoArVaiParaDlq() throws Exception {
+        NotaItem n = notaProcessando("87083010", "10.50");
+        enviarJob(n.getId());
+        await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> assertThat(mensagens("fiscal-dlq"))
+                .anyMatch(m -> m.path("notaId").asLong() == n.getId() && m.has("xmlPath")));
+        NotaItem r = repo.porId(n.getId()).orElseThrow();
+        assertThat(r.getStatus()).isEqualTo("processando");
+        assertThat(r.getTentativasEnvio()).isEqualTo(3);
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(mensagens("email-queue")).anyMatch(m ->
+                "fiscal-error".equals(m.path("MessageType").asText()) && "high".equals(m.path("severity").asText())
+                        && m.path("message").asText().contains("id " + n.getId())));
     }
 
     @Test
     void ncmInvalidoRejeitaNoXsd() throws Exception {
-        NotaItem n = notaProcessando("8708301");
+        NotaItem n = notaProcessando("8708301", "10.00");
         enviarJob(n.getId());
         await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
                 assertThat(repo.porId(n.getId()).orElseThrow().getStatus()).isEqualTo("rejeitada"));
@@ -448,7 +540,7 @@ class FiscalIT {
         secrets.putSecretValue(r -> r.secretId("wc-sefaz-certificate").secretString(CertificadosTeste.secret(true)));
         certificado.esquecer();
         try {
-            NotaItem n = notaProcessando("87083010");
+            NotaItem n = notaProcessando("87083010", "10.00");
             enviarJob(n.getId());
             await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> assertThat(mensagens("fiscal-dlq"))
                     .anyMatch(m -> m.path("notaId").asLong() == n.getId()));
