@@ -63,6 +63,15 @@ services:
     container_name: wc-auth-service
     ports: ["8080:8080"]
 
+  customer-service:
+    <<: *servico
+    build: { context: ../../backend, args: { MODULE: customer-service } }
+    container_name: wc-customer-service
+    ports: ["8081:8081"]
+    environment:
+      <<: *servico-env
+      SERVER_PORT: 8081
+
 networks:
   wc-net:
     name: wc-net

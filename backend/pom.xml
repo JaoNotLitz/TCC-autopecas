@@ -21,6 +21,7 @@
     <module>wc-commons</module>
     <module>auth-service</module>
     <module>wc-jwt-authorizer</module>
+    <module>customer-service</module>
   </modules>
 
   <properties>

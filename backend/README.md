@@ -8,6 +8,7 @@ O contrato da API é o do front React (`dinastiadoge/tcc`): ids numéricos, list
 |---|---|---|---|
 | `wc-commons` | — | EPB-00 | pronto |
 | `auth-service` | 8080 | EPB-01 | pronto (refresh token fora do escopo) |
+| `customer-service` | 8081 | EPB-03 | pronto (CRUD, busca, eventos e estatísticas de compras) |
 | `wc-jwt-authorizer` | Lambda | EPB-02 | pronto (o gateway e as rotas estão em `infra/local/init/ready.d/50-gateway.sh`) |
 
 ## Rodar

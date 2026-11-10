@@ -52,6 +52,10 @@ public final class InfraTeste {
         r.add("spring.data.redis.host", REDIS::getHost);
         r.add("spring.data.redis.port", () -> REDIS.getMappedPort(6379));
         r.add("spring.data.redis.password", () -> REDIS_SENHA);
+        r.add("spring.cloud.aws.endpoint", InfraTeste::endpoint);
+        r.add("spring.cloud.aws.region.static", () -> "sa-east-1");
+        r.add("spring.cloud.aws.credentials.access-key", () -> "test");
+        r.add("spring.cloud.aws.credentials.secret-key", () -> "test");
     }
 
     /** Procura {@code infra/local/init} subindo a partir do diretório do módulo. */
