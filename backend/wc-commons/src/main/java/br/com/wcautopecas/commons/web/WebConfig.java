@@ -17,4 +17,11 @@ public class WebConfig {
         reg.setOrder(Ordered.HIGHEST_PRECEDENCE);
         return reg;
     }
+
+    @Bean
+    public FilterRegistrationBean<ContentLengthFilter> contentLengthFilter() {
+        var reg = new FilterRegistrationBean<>(new ContentLengthFilter());
+        reg.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
+        return reg;
+    }
 }

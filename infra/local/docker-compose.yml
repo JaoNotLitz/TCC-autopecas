@@ -12,6 +12,13 @@ x-servico: &servico
     redis: { condition: service_healthy }
 
 services:
+  # Compila as Lambdas (jar com dependências) num volume que o LocalStack lê no init.
+  lambda-build:
+    build: { context: ../../backend, target: lambda, args: { MODULE: wc-jwt-authorizer } }
+    container_name: wc-lambda-build
+    volumes: [lambdas:/out]
+    networks: [wc-net]
+
   localstack:
     image: localstack/localstack:3.8.1   # última linha da Community sem token de conta
     container_name: wc-localstack
@@ -20,14 +27,19 @@ services:
     environment:
       SERVICES: dynamodb,sqs,sns,s3,secretsmanager,lambda,apigateway,ses,events,logs,iam,sts
       LAMBDA_DOCKER_NETWORK: wc-net
+      FRONT_ORIGIN: ${FRONT_ORIGIN}
     volumes:
       - ./init:/etc/localstack/init
+      - lambdas:/opt/wc/lambdas:ro
       - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      lambda-build: { condition: service_completed_successfully }
     healthcheck:
-      test: ["CMD-SHELL", "test -f /tmp/wc-init-done && curl -sf localhost:4566/_localstack/health >/dev/null"]
+      # Saudável só quando todos os scripts de init terminaram sem erro (ver 99-done.sh).
+      test: ["CMD-SHELL", "/etc/localstack/init/healthcheck.sh"]
       interval: 5s
       timeout: 5s
-      retries: 40
+      retries: 60
     networks: [wc-net]
 
   redis:
@@ -57,3 +69,4 @@ networks:
 
 volumes:
   redis-data:
+  lambdas:

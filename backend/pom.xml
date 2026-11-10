@@ -20,6 +20,7 @@
   <modules>
     <module>wc-commons</module>
     <module>auth-service</module>
+    <module>wc-jwt-authorizer</module>
   </modules>
 
   <properties>

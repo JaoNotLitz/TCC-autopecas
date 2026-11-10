@@ -44,6 +44,8 @@ jobs:
           curl -sf -X POST localhost:8080/api/auth/login \
             -H 'Content-Type: application/json' \
             -d '{"email":"admin@wcautopecas.com.br","senha":"admin123"}' | grep -q '"token"'
+      - name: Gateway e Lambda Authorizer
+        run: infra/local/smoke-gateway.sh
       - name: Logs em caso de falha
         if: failure()
         run: docker compose -f infra/local/docker-compose.yml logs --tail=200

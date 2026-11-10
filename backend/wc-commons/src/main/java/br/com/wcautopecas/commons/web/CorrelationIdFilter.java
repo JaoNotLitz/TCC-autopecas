@@ -14,6 +14,8 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
 
     public static final String HEADER = "X-Correlation-Id";
     public static final String MDC_KEY = "correlationId";
+    /** Repassado pelo API Gateway a partir do contexto do authorizer. Só para log: a identidade vem do JWT. */
+    public static final String HEADER_USUARIO = "X-Usuario-Id";
 
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse resp, FilterChain chain)
@@ -23,11 +25,16 @@ public class CorrelationIdFilter extends OncePerRequestFilter {
             id = UUID.randomUUID().toString();
         }
         MDC.put(MDC_KEY, id);
+        String usuario = req.getHeader(HEADER_USUARIO);
+        if (usuario != null && usuario.matches("\\d{1,19}")) {
+            MDC.put("usuarioId", usuario);
+        }
         resp.setHeader(HEADER, id);
         try {
             chain.doFilter(req, resp);
         } finally {
             MDC.remove(MDC_KEY);
+            MDC.remove("usuarioId");
         }
     }
 }

@@ -20,6 +20,7 @@ A primeira subida leva uns 2 minutos (download das imagens e build do Maven dent
 |---|---|---|
 | `wc-localstack` | 4566 | DynamoDB, SQS, SNS, S3, Secrets Manager, SES, Lambda, API Gateway (Community 3.8.1) |
 | `wc-redis` | 6379 | Sessões, contadores de login, cache e locks (senha em `REDIS_PASSWORD`) |
+| `wc-lambda-build` | — | Compila o jar da Lambda `wc-jwt-authorizer` num volume e encerra |
 | `wc-auth-service` | 8080 | Login, `/me`, logout |
 
 Os demais serviços entram aqui à medida que os épicos forem entregues.
@@ -35,6 +36,33 @@ serviços também recebem como variáveis de ambiente.
   o `sales-events-topic` da decisão A2 e as assinaturas (com filter policy na `email-queue`).
 - `30-s3.sh`: os 4 buckets, com CORS para o front e versionamento em `wc-documents-bucket` e `wc-backups`.
 - `40-secrets-ses.sh`: `wc-jwt-secret` (64 bytes aleatórios), `wc-redis-auth-token` e a identidade SES.
+- `50-gateway.sh`: a Lambda `wc-jwt-authorizer` e a API REST `wc-autopecas-api` (id fixo `wcapi`, stage `local`),
+  com as rotas da seção 3.2, respostas de erro do gateway no formato da seção 5.0 e o usage plan.
+
+O container do LocalStack só fica `healthy` quando todos esses scripts terminam sem erro (`init/healthcheck.sh`).
+
+## Gateway (endereço único para o front)
+
+```
+http://localhost:4566/restapis/wcapi/local/_user_request_/api
+http://wcapi.execute-api.localhost.localstack.cloud:4566/local/api   (mesmo gateway, URL mais curta)
+```
+
+No front, `VITE_API_URL` recebe uma dessas URLs (já terminando em `/api`). O id `wcapi` é fixo, então a URL
+não muda entre subidas. `infra/local/smoke-gateway.sh` confere login, `/me`, 401 sem token, CORS e o authorizer.
+
+| Caminho | Serviço |
+|---|---|
+| `/api/auth/*` (login sem token) | auth-service :8080 |
+| `/api/clientes`, `/api/clientes/*` | customer-service :8081 |
+| `/api/produtos`, `/api/produtos/*` | product-service :8082 |
+| `/api/vendas`, `/api/vendas/*` | sales-service :8083 |
+| `/api/notas`, `/api/notas/devolucao`, `/api/notas/{id}`, `/api/notas/{id}/*`, `/api/inutilizacoes` | fiscal-service :8084 |
+| `/api/notas/entrada`, `/api/notas/entrada/*` | entry-service :8085 |
+| `/api/notas/{id}/xml`, `/api/notas/{id}/pdf`, `/api/notas/lote-contador` | document-service :8086 |
+| `/api/notas/relatorio`, `/api/dashboard`, `/api/relatorios/*` | reports-service :8087 |
+
+Os serviços que ainda não existem respondem erro de integração até o épico deles entrar.
 
 ## Usuários de teste
 
@@ -58,6 +86,9 @@ curl -s -X POST localhost:8080/api/auth/login -H 'Content-Type: application/json
 | ALB | API Gateway REST (v1) do LocalStack com `HTTP_PROXY` para cada container (épico EPB-02) |
 | ElastiCache | Container `redis` |
 | DynamoDB Streams | Desligados (nenhum serviço consome ainda). `DYNAMO_STREAMS=1` no `.env` liga, ao custo de ~1 min a mais na subida |
+| Lambda Authorizer no gateway | O LocalStack Community cria o authorizer mas **não o executa** (é recurso do Pro). A Lambda roda de verdade no LocalStack e é testada chamando-a direto (`smoke-gateway.sh`); quem barra token inválido localmente é o filtro JWT + sessão de cada serviço, que já existiria de qualquer forma |
+| Respostas chunked | O provider do API Gateway que roda na Community perde o corpo de respostas `Transfer-Encoding: chunked`; o `wc-commons` responde com `Content-Length` (`ContentLengthFilter`) |
+| Throttling (usage plan) | Criado, mas a Community não aplica |
 | Persistência do LocalStack | A Community não persiste: a cada `make up` os recursos são recriados pelo init e o seed roda de novo. Por isso o `wc-jwt-secret` muda a cada subida e os tokens antigos deixam de valer |
 
 A imagem do LocalStack está fixa em `3.8.1`: as versões mais novas exigem token de conta da LocalStack.
