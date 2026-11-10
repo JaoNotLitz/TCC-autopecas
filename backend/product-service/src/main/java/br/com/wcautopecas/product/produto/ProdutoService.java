@@ -11,6 +11,7 @@ import br.com.wcautopecas.commons.seguranca.Papel;
 import br.com.wcautopecas.commons.seguranca.UsuarioAtual;
 import br.com.wcautopecas.commons.seguranca.UsuarioAutenticado;
 import br.com.wcautopecas.product.ProdutosProperties;
+import br.com.wcautopecas.product.api.Internos;
 import br.com.wcautopecas.product.api.Internos.AjusteAceito;
 import br.com.wcautopecas.product.api.Internos.AjusteInput;
 import br.com.wcautopecas.product.api.Internos.Disponibilidade;
@@ -143,6 +144,16 @@ public class ProdutoService {
         return new ProdutoFiscal(p.getId(), p.getCodigo(), p.getNome(), p.getNcm(), p.getPrecoVenda(),
                 Boolean.TRUE.equals(p.getAtivo()), atual, reservado, atual - reservado, p.getCfop(), p.getOrigem(),
                 p.getCstIcms(), p.getAliquotaIcms());
+    }
+
+    /** Resolve códigos de produto em ids (HU-B11.1 RF02); código desconhecido volta com id null. */
+    public List<Internos.CodigoProduto> porCodigos(List<String> codigos) {
+        return codigos.stream().distinct().map(c -> {
+            String codigo = c == null ? "" : c.trim();
+            return repo.porCodigo(codigo).or(() -> repo.porCodigo(codigo.toUpperCase()))
+                    .map(p -> new Internos.CodigoProduto(c, p.getId(), p.getNome(), Boolean.TRUE.equals(p.getAtivo())))
+                    .orElse(new Internos.CodigoProduto(c, null, null, false));
+        }).toList();
     }
 
     /** Disponibilidade somando linhas do mesmo produto (usada pelo sales-service). */

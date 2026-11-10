@@ -32,6 +32,11 @@ public class InternoController {
         return service.fiscal(id);
     }
 
+    @PostMapping("/por-codigo")
+    public List<Internos.CodigoProduto> porCodigo(@RequestBody List<String> codigos) {
+        return service.porCodigos(codigos);
+    }
+
     @PostMapping("/disponibilidade")
     public List<Disponibilidade> disponibilidade(@Valid @RequestBody List<ItemDisponibilidade> itens) {
         return service.disponibilidade(itens);

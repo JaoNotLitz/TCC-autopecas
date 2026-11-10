@@ -120,6 +120,9 @@ public class NotaService {
         if (n.getCancelamentoId() != null && "processando".equals(n.getStatus())) {
             throw new ConflitoException("Já existe um cancelamento em processamento para esta nota");
         }
+        if ("ENTRADA".equals(n.getTipo())) {
+            throw new RegraNegocioException("Nota de entrada é do fornecedor e não é cancelada por aqui");
+        }
         if (!"autorizada".equals(n.getStatus())) {
             throw new RegraNegocioException("Só notas autorizadas podem ser canceladas");
         }
