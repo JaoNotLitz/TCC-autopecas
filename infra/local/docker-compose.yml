@@ -119,6 +119,19 @@ services:
       PRODUCT_SERVICE_URL: http://product-service:8082
       FISCAL_SERVICE_URL: http://fiscal-service:8084
 
+  # DANFE (PDF), download do XML e lote de XMLs do contador.
+  document-service:
+    <<: *servico
+    build: { context: ../../backend, args: { MODULE: document-service } }
+    container_name: wc-document-service
+    ports: ["8086:8086"]
+    environment:
+      <<: *servico-env
+      SERVER_PORT: 8086
+      CONTADOR_EMAIL: ${CONTADOR_EMAIL:-contador@wcautopecas.local}
+      # O link do ZIP vai por e-mail e é aberto no navegador, então aponta para o LocalStack visto do host.
+      S3_ENDERECO_PUBLICO: http://localhost:4566
+
   # Simulador da SEFAZ (WireMock). Os cenários estão em sefaz-mock/README.md.
   sefaz-mock:
     image: wiremock/wiremock:3.9.2

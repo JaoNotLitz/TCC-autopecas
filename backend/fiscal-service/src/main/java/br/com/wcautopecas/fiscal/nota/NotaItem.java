@@ -51,6 +51,8 @@ public class NotaItem {
     private String motivoRejeicao;
     private String xmlPath;
     private String pdfPath;
+    /** Preenchido pelo document-service quando a nota vai no lote do contador (HU-B13.4). */
+    private String enviadaContadorEm;
     /** Evento de cancelamento em andamento (a nota fica "processando" até a SEFAZ responder). */
     private Long cancelamentoId;
 

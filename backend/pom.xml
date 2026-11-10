@@ -26,6 +26,7 @@
     <module>sales-service</module>
     <module>fiscal-service</module>
     <module>entry-service</module>
+    <module>document-service</module>
   </modules>
 
   <properties>
