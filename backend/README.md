@@ -10,6 +10,7 @@ O contrato da API é o do front React (`dinastiadoge/tcc`): ids numéricos, list
 | `auth-service` | 8080 | EPB-01 | pronto (refresh token fora do escopo) |
 | `customer-service` | 8081 | EPB-03 | pronto (CRUD, busca, eventos e estatísticas de compras) |
 | `product-service` | 8082 | EPB-04 e EPB-05 | pronto (catálogo, resumo, ajustes, listener de estoque e alertas) |
+| `sales-service` | 8083 | EPB-06 | pronto (venda e orçamento, validação de cliente e estoque, reserva, `sale.created`, `sale_completed`) |
 | `wc-jwt-authorizer` | Lambda | EPB-02 | pronto (o gateway e as rotas estão em `infra/local/init/ready.d/50-gateway.sh`) |
 
 ## Rodar
@@ -35,7 +36,10 @@ O que todo serviço ganha só por depender do módulo (auto-configuração do Sp
   em endpoints (403), `UsuarioAtual.exigir(...)` para regras condicionais e `UsuarioAutenticado` como parâmetro de controller.
   Caminhos públicos em `wc.seguranca.caminhos-publicos`.
 - **Clientes AWS** (`aws/`): DynamoDB (+ Enhanced), SQS, SNS, S3 e Secrets Manager, apontando para o LocalStack quando `wc.aws.endpoint` está preenchido.
-- **Mensageria** (`mensageria/`): `EventPublisher` (SQS e SNS, com atributos `eventType` e `correlationId`) e `IdempotencyGuard` (Redis `SET NX`).
+- **Mensageria** (`mensageria/`): `EventPublisher` (SQS e SNS, com atributos `eventType` e `correlationId`),
+  `Outbox` (envia na hora; se falhar, guarda no Redis em `outbox:{serviço}` e reenvia a cada minuto) e `IdempotencyGuard` (Redis `SET NX`).
+- **Chamadas entre serviços** (`web/ClienteInterno`): `RestClient` com timeout que repassa o token do usuário e o
+  `X-Correlation-Id` (decisão A4). As rotas `/internal/**` não passam pelo gateway.
 - **Validadores** (`validacao/`): `@CPF`, `@CNPJ`, `@CpfOuCnpj`, `@UF`, `@NCM`, `@ChaveAcesso`.
 - **Logs**: `logback-spring.xml` do serviço inclui `wc-logback.xml` (JSON com `correlationId`; texto nos perfis `test` e `dev`).
 - **Testes**: o test-jar traz `InfraTeste`, que sobe LocalStack (com os mesmos scripts de `infra/local/init`) e Redis uma vez por JVM.

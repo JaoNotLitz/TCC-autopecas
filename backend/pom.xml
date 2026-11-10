@@ -23,6 +23,7 @@
     <module>wc-jwt-authorizer</module>
     <module>customer-service</module>
     <module>product-service</module>
+    <module>sales-service</module>
   </modules>
 
   <properties>

@@ -26,4 +26,15 @@ confere "authorizer repassa o papel" "$(grep -o '"papel":"ADMIN"' <<<"$ok")" '"p
 ruim=$(invoca "{\"type\":\"REQUEST\",\"methodArn\":\"$arn\",\"headers\":{\"Authorization\":\"Bearer abc.def.ghi\"}}")
 confere "authorizer recusa token inválido" "$(grep -o 'Unauthorized' <<<"$ruim" | head -1)" Unauthorized
 
+# Venda pelo gateway: sales-service chama customer e product pela rede do Compose.
+auth="Authorization: Bearer $token"
+venda='{"tipoDocumento":"nfce","modalidade":"fisica","clienteId":null,"metodoPagamento":"pix","bandeira":null,
+"destinoDinheiro":null,"desconto":0,"status":"orcamento","itens":[{"produtoId":1,"quantidade":1,"valorUnitario":89.9}]}'
+criada=$(curl -s -w ' %{http_code}' -X POST "$G/vendas" -H "$auth" -H 'Content-Type: application/json' -d "$venda")
+confere "POST /vendas cria orçamento" "${criada##* }" 201
+id=$(sed -nE 's/^\{"id":([0-9]+),.*/\1/p' <<<"$criada")
+confere "DELETE /vendas/{id} cancela" "$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$G/vendas/$id" -H "$auth")" 204
+confere "estoque insuficiente responde 409" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/vendas" -H "$auth" \
+  -H 'Content-Type: application/json' -d "${venda/\"quantidade\":1/\"quantidade\":99999}")" 409
+
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

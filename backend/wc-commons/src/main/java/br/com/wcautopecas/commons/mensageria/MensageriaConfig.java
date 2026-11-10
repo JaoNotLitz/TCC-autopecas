@@ -12,12 +12,20 @@ import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @AutoConfiguration(after = {AwsClientsConfig.class, RedisAutoConfiguration.class, JacksonAutoConfiguration.class})
+@org.springframework.scheduling.annotation.EnableScheduling
 public class MensageriaConfig {
 
     @Bean
     @ConditionalOnMissingBean
     public EventPublisher eventPublisher(SqsClient sqs, SnsClient sns, ObjectMapper mapper) {
         return new EventPublisher(sqs, sns, mapper);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public Outbox outbox(EventPublisher publisher, StringRedisTemplate redis, ObjectMapper mapper,
+            @org.springframework.beans.factory.annotation.Value("${spring.application.name:servico}") String servico) {
+        return new Outbox(publisher, redis, mapper, servico);
     }
 
     @Bean

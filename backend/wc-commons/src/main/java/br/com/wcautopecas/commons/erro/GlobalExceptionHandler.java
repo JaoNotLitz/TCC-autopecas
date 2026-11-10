@@ -28,9 +28,9 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /** {@code campos} vazio some do JSON; quem lança a exceção decide se manda (ex.: 409 de estoque). */
     public static ResponseEntity<ApiError> resposta(HttpStatus status, String message, List<CampoErro> campos) {
-        boolean comCampos = status == HttpStatus.BAD_REQUEST || status == HttpStatus.UNPROCESSABLE_ENTITY;
-        ApiError corpo = new ApiError(message, status.value(), status.name(), comCampos ? campos : List.of());
+        ApiError corpo = new ApiError(message, status.value(), status.name(), campos == null ? List.of() : campos);
         return ResponseEntity.status(status).body(corpo);
     }
 
