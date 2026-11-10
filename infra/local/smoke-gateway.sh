@@ -61,8 +61,11 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 confere "SEFAZ simulada autoriza a nota" "$(grep -o '"status":"autorizada"' <<<"$nota")" '"status":"autorizada"'
-# Cancelamento pela nota: evento 110111 na SEFAZ simulada, nota e venda canceladas (EPB-10).
+# Downloads do document-service (EPB-13): XML autorizado e DANFE gerado a partir dele.
 nid=$(sed -nE 's/^\[\{"id":([0-9]+),.*/\1/p' <<<"$nota")
+confere "GET /notas/{id}/xml devolve o nfeProc" "$(curl -s "$G/notas/$nid/xml" -H "$auth" | grep -o '<nfeProc' | head -1)" '<nfeProc'
+confere "GET /notas/{id}/pdf devolve o DANFE" "$(curl -s "$G/notas/$nid/pdf" -H "$auth" | head -c 5)" '%PDF-'
+# Cancelamento pela nota: evento 110111 na SEFAZ simulada, nota e venda canceladas (EPB-10).
 confere "POST /notas/{id}/cancelamento" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/$nid/cancelamento" \
   -H "$auth" -H 'Content-Type: application/json' -d '{"justificativa":"Cliente desistiu da compra no balcao"}')" 200
 for _ in $(seq 1 30); do
@@ -71,6 +74,7 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 confere "SEFAZ simulada homologa o cancelamento" "$(grep -o '"status":"cancelada"' <<<"$nota")" '"status":"cancelada"'
+confere "DANFE da cancelada continua disponível" "$(curl -s -o /dev/null -w '%{http_code}' "$G/notas/$nid/pdf" -H "$auth")" 200
 confere "venda fica cancelada" "$(curl -s "$G/vendas/$vid" -H "$auth" | grep -o '"status":"cancelada"')" '"status":"cancelada"'
 
 # Nota de entrada do fornecedor: PF-001 por código, soma estoque e vira nota ENTRADA (EPB-11).
@@ -100,5 +104,9 @@ confere "importar-xml devolve o formulário" "${previa##* }" 200
 confere "importar-xml acha PF-001 no catálogo" "$(grep -o '"produtoId":[0-9]*,"codigo":"PF-001"' <<<"$previa" | head -1 | grep -c PF-001)" 1
 confere "chave repetida responde 409" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/entrada" -H "$auth" \
   -H 'Content-Type: application/json' -d "$entrada")" 409
+
+# Lote do contador (EPB-13): ZIP no wc-reports-bucket e e-mail na email-queue; o segundo envio não tem o que mandar.
+confere "POST /notas/lote-contador" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/lote-contador" -H "$auth")" 204
+confere "lote repetido no mês responde 409" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/lote-contador" -H "$auth")" 409
 
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

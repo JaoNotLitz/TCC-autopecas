@@ -1,0 +1,71 @@
+spring:
+  application:
+    name: document-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  jackson:
+    default-property-inclusion: always
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cloud:
+    aws:
+      endpoint: ${AWS_ENDPOINT_URL:}
+      region:
+        static: ${AWS_REGION:sa-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+
+server:
+  port: ${SERVER_PORT:8086}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+
+wc:
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:}
+    region: ${AWS_REGION:sa-east-1}
+    tabela-counters: ${TABLE_COUNTERS:counters}
+  jwt:
+    secret-name: ${SECRET_JWT:wc-jwt-secret}
+  cors:
+    origens: ${FRONT_ORIGIN:http://localhost:5173}
+  seguranca:
+    caminhos-publicos:
+      - /actuator/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+  documentos:
+    tabela-notas: ${TABLE_NOTAS_FISCAIS:notas_fiscais}
+    fila-documentos: ${QUEUE_DOCUMENT_EVENTS:document-events-queue}
+    fila-email: ${QUEUE_EMAIL:email-queue}
+    bucket-documentos: ${BUCKET_DOCUMENTS:wc-documents-bucket}
+    bucket-relatorios: ${BUCKET_REPORTS:wc-reports-bucket}
+    contador-email: ${CONTADOR_EMAIL:}
+    ambiente: ${SEFAZ_AMBIENTE:homologacao}
+    s3-endereco-publico: ${S3_ENDERECO_PUBLICO:}
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+springdoc:
+  api-docs:
+    enabled: true

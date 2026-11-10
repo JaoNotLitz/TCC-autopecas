@@ -41,6 +41,7 @@ serviços também recebem como variáveis de ambiente.
 - `30-s3.sh`: os 4 buckets, com CORS para o front e versionamento em `wc-documents-bucket` e `wc-backups`.
 - `40-secrets-ses.sh`: `wc-jwt-secret` (64 bytes aleatórios), `wc-redis-auth-token` e a identidade SES.
 - Exemplo de XML de fornecedor para a tela Nota de Entrada: [`exemplos/nfe-fornecedor.xml`](exemplos/nfe-fornecedor.xml) (o item PF-001 existe no catálogo do seed, o XYZ-999 não).
+- Lote do contador: o e-mail vai para `CONTADOR_EMAIL` (padrão `contador@wcautopecas.local`) e o ZIP fica em `wc-reports-bucket/lotes/{ano}/{mes}/`. Enquanto o notification-service não existe, a mensagem fica na `email-queue`; o link pré-assinado aponta para `http://localhost:4566` e abre direto no navegador.
 - Simulador da SEFAZ: container `wc-sefaz-mock` (WireMock, porta 8089). Os cenários (autoriza, rejeita, lote em processamento, fora do ar, timeout) saem do centavo do total da nota; tabela em [`sefaz-mock/README.md`](sefaz-mock/README.md).
 - `45-certificado.sh`: certificado A1 **autoassinado de teste** (OpenSSL, 365 dias) em `wc-sefaz-certificate` como `{"pfx": base64, "senha": ...}`. Só serve para o simulador da SEFAZ; os testes geram a versão vencida com o `keytool`.
 - `50-gateway.sh`: a Lambda `wc-jwt-authorizer` e a API REST `wc-autopecas-api` (id fixo `wcapi`, stage `local`),
