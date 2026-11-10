@@ -267,4 +267,16 @@ class ProdutoIT {
         assertThat(r.get(0).get("suficiente").asBoolean()).isFalse();
         assertThat(r.get(1).get("existe").asBoolean()).isFalse();
     }
+
+    @Test
+    void codigosViramIds() {
+        String codigo = codigo();
+        long id = criar(input(codigo, "Filtro", 1, 1)).get("id").asLong();
+        var r = chamar(HttpMethod.POST, "/internal/produtos/por-codigo", List.of(codigo, "NAO-EXISTE", codigo),
+                vendedor).getBody();
+        assertThat(r).hasSize(2);
+        assertThat(r.get(0).get("codigo").asText()).isEqualTo(codigo);
+        assertThat(r.get(0).get("produtoId").asLong()).isEqualTo(id);
+        assertThat(r.get(1).get("produtoId").isNull()).isTrue();
+    }
 }

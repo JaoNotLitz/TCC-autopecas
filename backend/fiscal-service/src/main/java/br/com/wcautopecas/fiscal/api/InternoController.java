@@ -7,7 +7,12 @@ import br.com.wcautopecas.fiscal.nota.NotaLinha;
 import br.com.wcautopecas.fiscal.nota.NotaRepository;
 import br.com.wcautopecas.fiscal.nota.NotaService;
 import java.util.List;
+import br.com.wcautopecas.fiscal.nota.EntradaService;
+import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -20,11 +25,21 @@ public class InternoController {
     private final NotaService notas;
     private final NotaRepository repo;
     private final EventoRepository eventos;
+    private final EntradaService entradas;
 
-    public InternoController(NotaService notas, NotaRepository repo, EventoRepository eventos) {
+    public InternoController(NotaService notas, NotaRepository repo, EventoRepository eventos,
+            EntradaService entradas) {
         this.notas = notas;
         this.repo = repo;
         this.eventos = eventos;
+        this.entradas = entradas;
+    }
+
+    /** HU-B11.1 RF05: o entry-service grava aqui a nota ENTRADA (já validada lá). */
+    @PostMapping("/entrada")
+    @ResponseStatus(HttpStatus.CREATED)
+    public NotaDto entrada(@RequestBody EntradaService.Entrada in) {
+        return entradas.registrar(in);
     }
 
     /** {@code eventos}: cancelamentos pedidos para a nota, com resultado na SEFAZ (HU-B10.3 RF03). */

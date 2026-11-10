@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: entry-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  jackson:
+    default-property-inclusion: always
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  servlet:
+    multipart:
+      # HU-B11.2: XML de até 5 MB; acima disso responde 413
+      max-file-size: 5MB
+      max-request-size: 6MB
+
+server:
+  port: ${SERVER_PORT:8085}
+  shutdown: graceful
+  tomcat:
+    # lê o resto de um upload grande para responder 413 em vez de derrubar a conexão
+    max-swallow-size: 20MB
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+
+wc:
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:}
+    region: ${AWS_REGION:sa-east-1}
+    tabela-counters: ${TABLE_COUNTERS:counters}
+  jwt:
+    secret-name: ${SECRET_JWT:wc-jwt-secret}
+  cors:
+    origens: ${FRONT_ORIGIN:http://localhost:5173}
+  seguranca:
+    caminhos-publicos:
+      - /actuator/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+  entradas:
+    tabela-entradas: ${TABLE_ENTRY_NOTES:entry_notes}
+    tabela-fornecedores: ${TABLE_SUPPLIERS:suppliers}
+    fila-estoque: ${QUEUE_INVENTORY_UPDATES:inventory-updates-queue}
+    product-url: ${PRODUCT_SERVICE_URL:http://product-service:8082}
+    fiscal-url: ${FISCAL_SERVICE_URL:http://fiscal-service:8084}
+    timeout-chamadas: 2s
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+springdoc:
+  api-docs:
+    enabled: true

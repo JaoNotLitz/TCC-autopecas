@@ -650,4 +650,38 @@ class FiscalIT {
             certificado.esquecer();
         }
     }
+
+    @Test
+    void entradaDoFornecedorViraNotaEntrada() {
+        long numero = VENDAS.incrementAndGet();
+        String chave = ChaveAcesso.gerar("35", "2609", "11222333000181", "55", "1", numero % 1_000_000_000, "1").valor();
+        Map<String, Object> in = Map.of("entradaId", 77, "fornecedorId", 12, "numero", "12345", "serie", "1",
+                "chaveAcesso", chave, "dataEmissao", "2026-09-20", "itens", List.of(
+                        Map.of("produtoId", 7, "codigo", "P-7", "descricao", "Peça 7", "ncm", "87083010",
+                                "cfop", "1102", "quantidade", 100, "valorUnitario", 45.5),
+                        Map.of("produtoId", 8, "codigo", "P-8", "descricao", "Peça 8", "ncm", "87083010",
+                                "cfop", "2102", "quantidade", 4, "valorUnitario", 120.9)));
+        var r = chamar(HttpMethod.POST, "/internal/notas/entrada", in, vendedor);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        JsonNode nota = r.getBody();
+        assertThat(nota.get("tipo").asText()).isEqualTo("ENTRADA");
+        assertThat(nota.get("status").asText()).isEqualTo("autorizada");
+        assertThat(nota.get("fornecedorId").asLong()).isEqualTo(12);
+        assertThat(nota.get("clienteId").isNull()).isTrue();
+        assertThat(nota.get("valorTotal").decimalValue()).isEqualByComparingTo("5033.60");
+        assertThat(nota.get("emitidaEm").asText()).isEqualTo("2026-09-20T03:00:00Z");
+        long id = nota.get("id").asLong();
+
+        // repetida (retentativa do entry-service): mesma nota
+        assertThat(chamar(HttpMethod.POST, "/internal/notas/entrada", in, vendedor).getBody().get("id").asLong())
+                .isEqualTo(id);
+        var lista = toList(chamar(HttpMethod.GET, "/api/notas?tipo=ENTRADA", null, vendedor).getBody());
+        assertThat(lista).anyMatch(x -> x.get("id").asLong() == id);
+        var itens = chamar(HttpMethod.GET, "/api/notas/" + id + "/itens", null, vendedor).getBody();
+        assertThat(itens.get(1).get("cfop").asText()).isEqualTo("2102");
+
+        var cancelar = chamar(HttpMethod.POST, "/api/notas/" + id + "/cancelamento",
+                Map.of("justificativa", "Tentando cancelar nota de terceiro"), admin);
+        assertThat(cancelar.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
 }

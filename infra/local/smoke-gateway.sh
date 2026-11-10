@@ -73,4 +73,32 @@ done
 confere "SEFAZ simulada homologa o cancelamento" "$(grep -o '"status":"cancelada"' <<<"$nota")" '"status":"cancelada"'
 confere "venda fica cancelada" "$(curl -s "$G/vendas/$vid" -H "$auth" | grep -o '"status":"cancelada"')" '"status":"cancelada"'
 
+# Nota de entrada do fornecedor: PF-001 por código, soma estoque e vira nota ENTRADA (EPB-11).
+dv_chave() { local b=$1 s=0 p=2 i; for ((i=${#b}-1; i>=0; i--)); do s=$((s + ${b:i:1} * p)); p=$((p == 9 ? 2 : p + 1)); done
+  local r=$((s % 11)); echo $((r < 2 ? 0 : 11 - r)); }
+nnf=$(printf '%09d' $(( $(date +%s) % 1000000000 )))
+base="3526091122233300018155001${nnf}112345678"
+chave="${base}$(dv_chave "$base")"
+antes=$(curl -s "$G/produtos/1" -H "$auth" | sed -nE 's/.*"estoqueAtual":([0-9]+).*/\1/p')
+entrada='{"fornecedor":{"cnpj":"11222333000181","razaoSocial":"Distribuidora Freios Brasil LTDA","ie":"244123456119","uf":"SP"},
+"numero":"'"$((10#$nnf))"'","serie":"1","dataEmissao":"2026-09-20","dataEntrada":"2026-09-21","chaveAcesso":"'"$chave"'",
+"naturezaOperacao":"Compra para comercializacao","itens":[{"produtoId":null,"codigo":"PF-001","descricao":"Pastilha",
+"ncm":"87083010","cfop":"1102","quantidade":5,"valorUnitario":45.5}]}'
+resp=$(curl -s -w ' %{http_code}' -X POST "$G/notas/entrada" -H "$auth" -H 'Content-Type: application/json' -d "$entrada")
+confere "POST /notas/entrada registra" "${resp##* }" 201
+confere "entrada vira nota ENTRADA" "$(grep -o '"tipo":"ENTRADA"' <<<"$resp")" '"tipo":"ENTRADA"'
+depois=""
+for _ in $(seq 1 20); do
+  depois=$(curl -s "$G/produtos/1" -H "$auth" | sed -nE 's/.*"estoqueAtual":([0-9]+).*/\1/p')
+  [ "$depois" = "$((antes + 5))" ] && break
+  sleep 1
+done
+confere "entrada soma o estoque" "$depois" "$((antes + 5))"
+previa=$(curl -s -w ' %{http_code}' -X POST "$G/notas/entrada/importar-xml" -H "$auth" \
+  -F "arquivo=@$(dirname "$0")/exemplos/nfe-fornecedor.xml;type=text/xml")
+confere "importar-xml devolve o formulário" "${previa##* }" 200
+confere "importar-xml acha PF-001 no catálogo" "$(grep -o '"produtoId":[0-9]*,"codigo":"PF-001"' <<<"$previa" | head -1 | grep -c PF-001)" 1
+confere "chave repetida responde 409" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/entrada" -H "$auth" \
+  -H 'Content-Type: application/json' -d "$entrada")" 409
+
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

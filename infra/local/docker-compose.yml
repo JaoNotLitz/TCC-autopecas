@@ -108,6 +108,17 @@ services:
       <<: *servico-deps
       sefaz-mock: { condition: service_healthy }
 
+  entry-service:
+    <<: *servico
+    build: { context: ../../backend, args: { MODULE: entry-service } }
+    container_name: wc-entry-service
+    ports: ["8085:8085"]
+    environment:
+      <<: *servico-env
+      SERVER_PORT: 8085
+      PRODUCT_SERVICE_URL: http://product-service:8082
+      FISCAL_SERVICE_URL: http://fiscal-service:8084
+
   # Simulador da SEFAZ (WireMock). Os cenários estão em sefaz-mock/README.md.
   sefaz-mock:
     image: wiremock/wiremock:3.9.2

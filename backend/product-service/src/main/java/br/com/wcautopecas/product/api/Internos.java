@@ -19,6 +19,10 @@ public final class Internos {
             String cstIcms, BigDecimal aliquotaIcms) {
     }
 
+    /** POST /internal/produtos/por-codigo: {@code produtoId} de cada código, ou null (entry-service). */
+    public record CodigoProduto(String codigo, Long produtoId, String nome, boolean ativo) {
+    }
+
     public record ItemDisponibilidade(@NotNull Long produtoId, @NotNull Long quantidade) {
     }
 
