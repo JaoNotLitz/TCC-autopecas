@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
+<tr><td style="background:#b91c1c;padding:20px 32px;color:#ffffff;font-size:20px;font-weight:bold;">WC Autopeças</td></tr>
+<tr><td style="padding:32px;font-size:15px;line-height:1.6;">
+<p style="margin:0 0 16px;font-size:18px;color:#b91c1c;font-weight:bold;">Estoque crítico</p>
+<p style="margin:0 0 24px;">O produto abaixo chegou ao nível crítico de estoque e precisa de reposição.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border:1px solid #e5e7eb;border-radius:6px;">
+<tr><td style="padding:12px 16px;color:#6b7280;">Produto</td><td style="padding:12px 16px;text-align:right;font-weight:bold;"><span th:text="${codigo}">PF-001</span> · <span th:text="${nome}">Produto</span></td></tr>
+<tr><td style="padding:12px 16px;color:#6b7280;border-top:1px solid #e5e7eb;">Estoque atual</td><td style="padding:12px 16px;text-align:right;font-weight:bold;color:#b91c1c;border-top:1px solid #e5e7eb;" th:text="${estoqueAtual}">0</td></tr>
+<tr><td style="padding:12px 16px;color:#6b7280;border-top:1px solid #e5e7eb;">Estoque mínimo</td><td style="padding:12px 16px;text-align:right;border-top:1px solid #e5e7eb;" th:text="${estoqueMinimo}">0</td></tr>
+</table>
+</td></tr>
+<tr><td style="padding:16px 32px;background:#f9fafb;color:#6b7280;font-size:12px;">Mensagem automática da WC Autopeças. Não responda este e-mail.</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -28,6 +28,7 @@
     <module>entry-service</module>
     <module>document-service</module>
     <module>reports-service</module>
+    <module>notification-service</module>
   </modules>
 
   <properties>

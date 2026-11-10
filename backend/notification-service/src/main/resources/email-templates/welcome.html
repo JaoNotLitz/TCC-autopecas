@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR" xmlns:th="http://www.thymeleaf.org">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:24px 0;">
+<tr><td align="center">
+<table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:8px;overflow:hidden;">
+<tr><td style="background:#b91c1c;padding:20px 32px;color:#ffffff;font-size:20px;font-weight:bold;">WC Autopeças</td></tr>
+<tr><td style="padding:32px;font-size:15px;line-height:1.6;">
+<p style="margin:0 0 16px;font-size:18px;">Olá, <strong th:text="${nome}">cliente</strong>!</p>
+<th:block th:if="${atualizacao}">
+<p style="margin:0 0 16px;">Este é agora o e-mail do seu cadastro na WC Autopeças. É nele que você vai receber as confirmações de compra.</p>
+<p style="margin:0;">Se não foi você quem pediu a troca, fale com a loja.</p>
+</th:block>
+<th:block th:unless="${atualizacao}">
+<p style="margin:0 0 16px;">Seu cadastro na WC Autopeças está feito. A partir de agora você recebe por aqui a confirmação das suas compras.</p>
+<p style="margin:0;">Obrigado pela preferência!</p>
+</th:block>
+</td></tr>
+<tr><td style="padding:16px 32px;background:#f9fafb;color:#6b7280;font-size:12px;">Mensagem automática da WC Autopeças. Não responda este e-mail.</td></tr>
+</table>
+</td></tr>
+</table>
+</body>
+</html>

@@ -143,6 +143,18 @@ services:
       SERVER_PORT: 8087
       FISCAL_SERVICE_URL: http://fiscal-service:8084
 
+  # E-mails por template no SES local (veja em http://localhost:4566/_aws/ses).
+  notification-service:
+    <<: *servico
+    build: { context: ../../backend, args: { MODULE: notification-service } }
+    container_name: wc-notification-service
+    ports: ["8088:8088"]
+    environment:
+      <<: *servico-env
+      SERVER_PORT: 8088
+      ALERTA_ESTOQUE_DESTINATARIOS: ${ALERTA_ESTOQUE_DESTINATARIOS:-compras@wcautopecas.local}
+      OPS_DESTINATARIOS: ${OPS_DESTINATARIOS:-ops@wcautopecas.local}
+
   # Simulador da SEFAZ (WireMock). Os cenários estão em sefaz-mock/README.md.
   sefaz-mock:
     image: wiremock/wiremock:3.9.2

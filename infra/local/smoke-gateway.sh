@@ -117,4 +117,17 @@ lista=$(curl -s "$G/notas?status=cancelada&de=$hoje&ate=$hoje" -H "$auth" | grep
 confere "listagem acha a cancelada de hoje" "$([ "$lista" -ge 1 ] && echo sim)" sim
 confere "relatório tem as notas da listagem" "$(($(wc -l <<<"$csv") - 1))" "$lista"
 
+# E-mails (EPB-15): o notification-service manda pelo SES local, que guarda tudo em /_aws/ses.
+ses() { curl -s "http://localhost:4566/_aws/ses"; }
+cpf() { local b=$(printf '%09d' $(( (RANDOM * 32768 + RANDOM) % 1000000000 ))) s i d1 d2
+  s=0; for i in $(seq 0 8); do s=$((s + ${b:i:1} * (10 - i))); done; d1=$(( (s * 10) % 11 % 10 ))
+  s=0; for i in $(seq 0 8); do s=$((s + ${b:i:1} * (11 - i))); done; s=$((s + d1 * 2)); d2=$(( (s * 10) % 11 % 10 ))
+  echo "$b$d1$d2"; }
+novo="smoke+$(date +%s)@email.com"
+confere "POST /clientes com e-mail" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/clientes" -H "$auth" \
+  -H 'Content-Type: application/json' -d "{\"tipo\":\"PF\",\"documento\":\"$(cpf)\",\"nome\":\"Cliente Smoke\",\"email\":\"$novo\"}")" 201
+for _ in $(seq 1 30); do ses | grep -q "$novo" && break; sleep 1; done
+confere "cliente novo recebe boas-vindas" "$(ses | grep -c "$novo")" 1
+confere "contador recebe o lote" "$(ses | grep -o 'contador@wcautopecas.local' | head -1)" contador@wcautopecas.local
+
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }
