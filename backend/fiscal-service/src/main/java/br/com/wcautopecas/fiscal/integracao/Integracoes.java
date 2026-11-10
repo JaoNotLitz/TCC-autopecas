@@ -29,4 +29,7 @@ public interface Integracoes {
     ProdutoFiscal produto(long id);
 
     void vincularNota(long vendaId, long notaFiscalId);
+
+    /** Nota da venda cancelada na SEFAZ: a venda passa para "cancelada" (sem mexer no estoque). */
+    void cancelarVenda(long vendaId, long notaFiscalId);
 }

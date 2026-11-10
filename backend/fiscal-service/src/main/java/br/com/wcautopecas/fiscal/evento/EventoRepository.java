@@ -34,6 +34,20 @@ public class EventoRepository {
                 .item(EVENTO.itemToMap(e, true)).conditionExpression("attribute_not_exists(id)").build()).build();
     }
 
+    public java.util.Optional<EventoFiscal> porId(long id) {
+        return java.util.Optional.ofNullable(eventos.getItem(Key.builder().partitionValue(id).build()));
+    }
+
+    /** Put condicional ao status, para compor transações com a nota. */
+    public TransactWriteItem seStatusTx(EventoFiscal e, String statusEsperado) {
+        return TransactWriteItem.builder().put(Put.builder().tableName(props.getTabelaEventos())
+                .item(EVENTO.itemToMap(e, true)).conditionExpression("#s = :s")
+                .expressionAttributeNames(java.util.Map.of("#s", "status"))
+                .expressionAttributeValues(java.util.Map.of(":s",
+                        software.amazon.awssdk.services.dynamodb.model.AttributeValue.fromS(statusEsperado)))
+                .build()).build();
+    }
+
     public List<EventoFiscal> daNota(long notaId) {
         var cond = QueryConditional.keyEqualTo(Key.builder().partitionValue(notaId).build());
         return ListagemDynamo.todos(eventos.index("nota-index").query(r -> r.queryConditional(cond)));

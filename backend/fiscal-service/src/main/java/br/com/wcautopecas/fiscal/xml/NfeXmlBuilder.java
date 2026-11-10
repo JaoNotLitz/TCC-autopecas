@@ -302,13 +302,13 @@ public class NfeXmlBuilder {
         }
     }
 
-    private static Element el(Element pai, String nome) {
+    static Element el(Element pai, String nome) {
         Element e = pai.getOwnerDocument().createElementNS(NS, nome);
         pai.appendChild(e);
         return e;
     }
 
-    private static Element el(Element pai, String nome, String texto) {
+    static Element el(Element pai, String nome, String texto) {
         Element e = el(pai, nome);
         e.setTextContent(texto);
         return e;

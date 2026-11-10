@@ -163,6 +163,28 @@ public class VendaService {
         }
     }
 
+    /**
+     * EPB-10: a nota da venda foi cancelada na SEFAZ. A venda passa para "cancelada"; o estoque
+     * volta pelo fiscal-service ({@code increase}), então aqui não há {@code release}. Idempotente.
+     */
+    public void canceladaPelaNota(long vendaId, long notaFiscalId) {
+        VendaItem v = existente(vendaId);
+        if (CANCELADA.equals(v.getStatus())) {
+            return;
+        }
+        if (!FINALIZADA.equals(v.getStatus())) {
+            throw new RegraNegocioException("Só vendas finalizadas são canceladas pela nota fiscal");
+        }
+        v.setStatus(CANCELADA);
+        v.setCanceladaEm(clock.instant().toString());
+        if (v.getNotaFiscalId() == null) {
+            v.setNotaFiscalId(notaFiscalId);
+        }
+        if (!repo.salvarSeStatus(v, FINALIZADA)) {
+            throw new ConflitoException("A venda foi alterada por outra operação. Atualize e tente de novo");
+        }
+    }
+
     private VendaItem existente(long id) {
         return repo.porId(id).orElseThrow(() -> new NaoEncontradoException("Venda não encontrada"));
     }
