@@ -1,0 +1,12 @@
+[
+  {"id": 1,  "tipo": "PF", "documento": "12345678909",    "nome": "João Pereira",                 "email": "joao.pereira@exemplo.com.br",  "telefone": "11987654321", "cidade": "São Paulo",       "uf": "SP"},
+  {"id": 2,  "tipo": "PF", "documento": "98765432100",    "nome": "Maria Oliveira",               "email": "maria.oliveira@exemplo.com.br","telefone": "11912345678", "cidade": "Campinas",        "uf": "SP"},
+  {"id": 3,  "tipo": "PF", "documento": "45612378955",    "nome": "Carlos Souza",                 "email": "carlos.souza@exemplo.com.br",  "telefone": "2133334444",  "cidade": "Rio de Janeiro",  "uf": "RJ"},
+  {"id": 4,  "tipo": "PF", "documento": "32165498791",    "nome": "Ana Lima",                     "email": null,                           "telefone": "31988887777", "cidade": "Belo Horizonte",  "uf": "MG"},
+  {"id": 5,  "tipo": "PF", "documento": "74185296355",    "nome": "Pedro Santos",                 "email": "pedro.santos@exemplo.com.br",  "telefone": null,          "cidade": "Curitiba",        "uf": "PR"},
+  {"id": 6,  "tipo": "PF", "documento": "15975348625",    "nome": "Fernanda Costa",               "email": "fernanda.costa@exemplo.com.br","telefone": "51999990000", "cidade": "Porto Alegre",    "uf": "RS"},
+  {"id": 7,  "tipo": "PJ", "documento": "12345678000195", "nome": "Auto Peças Silva LTDA",        "email": "contato@silvapecas.exemplo.com.br", "telefone": "1132221100", "cidade": "São Paulo", "uf": "SP"},
+  {"id": 8,  "tipo": "PJ", "documento": "98765432000198", "nome": "Oficina Mecânica Rápida ME",   "email": "oficina@rapida.exemplo.com.br","telefone": "1933445566",  "cidade": "Campinas",        "uf": "SP"},
+  {"id": 9,  "tipo": "PJ", "documento": "45678912000155", "nome": "Transportadora Estrada Boa SA","email": "frota@estradaboa.exemplo.com.br","telefone": "4130304040", "cidade": "Curitiba",        "uf": "PR"},
+  {"id": 10, "tipo": "PJ", "documento": "11223344000186", "nome": "Centro Automotivo Nordeste",   "email": "compras@cannordeste.exemplo.com.br","telefone": "8132325050","cidade": "Recife",       "uf": "PE"}
+]

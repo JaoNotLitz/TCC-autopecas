@@ -1,0 +1,72 @@
+spring:
+  application:
+    name: customer-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  jackson:
+    default-property-inclusion: always
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cloud:
+    aws:
+      endpoint: ${AWS_ENDPOINT_URL:}
+      region:
+        static: ${AWS_REGION:sa-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+
+server:
+  port: ${SERVER_PORT:8081}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+
+wc:
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:}
+    region: ${AWS_REGION:sa-east-1}
+    tabela-counters: ${TABLE_COUNTERS:counters}
+  jwt:
+    secret-name: ${SECRET_JWT:wc-jwt-secret}
+  cors:
+    origens: ${FRONT_ORIGIN:http://localhost:5173}
+  seguranca:
+    caminhos-publicos:
+      - /actuator/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+  clientes:
+    tabela: ${TABLE_CUSTOMERS:customers}
+    fila-eventos: ${QUEUE_CUSTOMER_EVENTS:customer-events-queue}
+    fila-vendas: ${QUEUE_CUSTOMER_SALES_EVENTS:customer-sales-events-queue}
+    cache-busca: 5m
+    cache-cliente: 1h
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+springdoc:
+  api-docs:
+    enabled: true
+wc:
+  clientes:
+    seed:
+      habilitado: true

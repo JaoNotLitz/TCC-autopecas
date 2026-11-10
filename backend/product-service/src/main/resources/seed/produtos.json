@@ -1,0 +1,202 @@
+[
+ {
+  "id": 1,
+  "codigo": "PF-001",
+  "nome": "Pastilha de Freio Dianteira",
+  "ncm": "87083010",
+  "estoqueAtual": 45,
+  "estoqueMinimo": 15,
+  "precoCusto": 45.5,
+  "precoVenda": 89.9
+ },
+ {
+  "id": 2,
+  "codigo": "PF-002",
+  "nome": "Pastilha de Freio Traseira",
+  "ncm": "87083010",
+  "estoqueAtual": 8,
+  "estoqueMinimo": 15,
+  "precoCusto": 39.9,
+  "precoVenda": 79.9
+ },
+ {
+  "id": 3,
+  "codigo": "DF-001",
+  "nome": "Disco de Freio Ventilado",
+  "ncm": "87083090",
+  "estoqueAtual": 12,
+  "estoqueMinimo": 10,
+  "precoCusto": 98.0,
+  "precoVenda": 179.9
+ },
+ {
+  "id": 4,
+  "codigo": "FO-001",
+  "nome": "Filtro de Óleo",
+  "ncm": "84212300",
+  "estoqueAtual": 120,
+  "estoqueMinimo": 40,
+  "precoCusto": 12.3,
+  "precoVenda": 27.9
+ },
+ {
+  "id": 5,
+  "codigo": "FA-001",
+  "nome": "Filtro de Ar do Motor",
+  "ncm": "84213100",
+  "estoqueAtual": 30,
+  "estoqueMinimo": 40,
+  "precoCusto": 18.5,
+  "precoVenda": 39.9
+ },
+ {
+  "id": 6,
+  "codigo": "FC-001",
+  "nome": "Filtro de Combustível",
+  "ncm": "84212300",
+  "estoqueAtual": 5,
+  "estoqueMinimo": 20,
+  "precoCusto": 22.0,
+  "precoVenda": 49.9
+ },
+ {
+  "id": 7,
+  "codigo": "FB-001",
+  "nome": "Filtro de Cabine",
+  "ncm": "84213990",
+  "estoqueAtual": 25,
+  "estoqueMinimo": 20,
+  "precoCusto": 15.0,
+  "precoVenda": 34.9
+ },
+ {
+  "id": 8,
+  "codigo": "VL-001",
+  "nome": "Vela de Ignição",
+  "ncm": "85111000",
+  "estoqueAtual": 200,
+  "estoqueMinimo": 80,
+  "precoCusto": 9.9,
+  "precoVenda": 24.9
+ },
+ {
+  "id": 9,
+  "codigo": "CB-001",
+  "nome": "Cabo de Vela (jogo)",
+  "ncm": "85443000",
+  "estoqueAtual": 14,
+  "estoqueMinimo": 12,
+  "precoCusto": 65.0,
+  "precoVenda": 129.9
+ },
+ {
+  "id": 10,
+  "codigo": "AM-001",
+  "nome": "Amortecedor Dianteiro",
+  "ncm": "87088000",
+  "estoqueAtual": 6,
+  "estoqueMinimo": 8,
+  "precoCusto": 180.0,
+  "precoVenda": 329.9
+ },
+ {
+  "id": 11,
+  "codigo": "AM-002",
+  "nome": "Amortecedor Traseiro",
+  "ncm": "87088000",
+  "estoqueAtual": 3,
+  "estoqueMinimo": 8,
+  "precoCusto": 150.0,
+  "precoVenda": 289.9
+ },
+ {
+  "id": 12,
+  "codigo": "CO-001",
+  "nome": "Correia Dentada",
+  "ncm": "40103100",
+  "estoqueAtual": 18,
+  "estoqueMinimo": 15,
+  "precoCusto": 55.0,
+  "precoVenda": 109.9
+ },
+ {
+  "id": 13,
+  "codigo": "BA-001",
+  "nome": "Bateria 60Ah",
+  "ncm": "85071000",
+  "estoqueAtual": 9,
+  "estoqueMinimo": 10,
+  "precoCusto": 320.0,
+  "precoVenda": 549.9
+ },
+ {
+  "id": 14,
+  "codigo": "LA-001",
+  "nome": "Lâmpada H4",
+  "ncm": "85392110",
+  "estoqueAtual": 60,
+  "estoqueMinimo": 30,
+  "precoCusto": 8.5,
+  "precoVenda": 19.9
+ },
+ {
+  "id": 15,
+  "codigo": "OL-001",
+  "nome": "Óleo Motor 5W30 1L",
+  "ncm": "27101932",
+  "estoqueAtual": 150,
+  "estoqueMinimo": 100,
+  "precoCusto": 28.0,
+  "precoVenda": 49.9
+ },
+ {
+  "id": 16,
+  "codigo": "RA-001",
+  "nome": "Radiador",
+  "ncm": "87089100",
+  "estoqueAtual": 2,
+  "estoqueMinimo": 5,
+  "precoCusto": 350.0,
+  "precoVenda": 599.9
+ },
+ {
+  "id": 17,
+  "codigo": "BO-001",
+  "nome": "Bomba d'Água",
+  "ncm": "84133090",
+  "estoqueAtual": 11,
+  "estoqueMinimo": 10,
+  "precoCusto": 120.0,
+  "precoVenda": 219.9
+ },
+ {
+  "id": 18,
+  "codigo": "EM-001",
+  "nome": "Kit Embreagem",
+  "ncm": "87089300",
+  "estoqueAtual": 4,
+  "estoqueMinimo": 6,
+  "precoCusto": 420.0,
+  "precoVenda": 749.9
+ },
+ {
+  "id": 19,
+  "codigo": "PA-001",
+  "nome": "Palheta Limpador (par)",
+  "ncm": "85129000",
+  "estoqueAtual": 40,
+  "estoqueMinimo": 25,
+  "precoCusto": 19.9,
+  "precoVenda": 44.9
+ },
+ {
+  "id": 20,
+  "codigo": "RO-001",
+  "nome": "Rolamento de Roda",
+  "ncm": "84821010",
+  "estoqueAtual": 16,
+  "estoqueMinimo": 20,
+  "precoCusto": 48.0,
+  "precoVenda": 95.9
+ }
+]
