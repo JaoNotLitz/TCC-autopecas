@@ -25,6 +25,7 @@ A primeira subida leva uns 2 minutos (download das imagens e build do Maven dent
 | `wc-customer-service` | 8081 | Clientes (com 10 clientes de exemplo no perfil local) |
 | `wc-product-service` | 8082 | Produtos, estoque e o listener da `inventory-updates-queue` (com 20 produtos de exemplo) |
 | `wc-sales-service` | 8083 | Vendas e orçamentos; chama customer e product pelas rotas internas e publica reserva, `sale.created` e `sale_completed` |
+| `wc-fiscal-service` | 8084 | Notas fiscais: cria a nota de cada venda finalizada, consulta, cancelamento, inutilização e devolução |
 
 Os demais serviços entram aqui à medida que os épicos forem entregues.
 

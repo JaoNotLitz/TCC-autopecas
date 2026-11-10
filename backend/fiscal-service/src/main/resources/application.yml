@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: fiscal-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  jackson:
+    default-property-inclusion: always
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cloud:
+    aws:
+      endpoint: ${AWS_ENDPOINT_URL:}
+      region:
+        static: ${AWS_REGION:sa-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+
+server:
+  port: ${SERVER_PORT:8084}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+
+wc:
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:}
+    region: ${AWS_REGION:sa-east-1}
+    tabela-counters: ${TABLE_COUNTERS:counters}
+  jwt:
+    secret-name: ${SECRET_JWT:wc-jwt-secret}
+  cors:
+    origens: ${FRONT_ORIGIN:http://localhost:5173}
+  seguranca:
+    caminhos-publicos:
+      - /actuator/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+  fiscal:
+    tabela-notas: ${TABLE_NOTAS_FISCAIS:notas_fiscais}
+    tabela-itens: ${TABLE_NOTAS_ITEMS:notas_items}
+    tabela-eventos: ${TABLE_FISCAL_EVENTS:fiscal_events}
+    fila-vendas: ${QUEUE_SALES_EVENTS:sales-events-queue}
+    fila-jobs: ${QUEUE_FISCAL_JOBS:fiscal-jobs-queue}
+    fila-eventos: ${QUEUE_FISCAL_EVENTS:fiscal-events-queue}
+    sales-url: ${SALES_SERVICE_URL:http://sales-service:8083}
+    customer-url: ${CUSTOMER_SERVICE_URL:http://customer-service:8081}
+    product-url: ${PRODUCT_SERVICE_URL:http://product-service:8082}
+    timeout-chamadas: 2s
+    serie: "1"
+    ambiente: ${SEFAZ_AMBIENTE:homologacao}
+    uf-emitente: ${EMITENTE_UF:SP}
+    prazo-cancelamento: 24h
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+springdoc:
+  api-docs:
+    enabled: true

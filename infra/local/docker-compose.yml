@@ -92,6 +92,18 @@ services:
       CUSTOMER_SERVICE_URL: http://customer-service:8081
       PRODUCT_SERVICE_URL: http://product-service:8082
 
+  fiscal-service:
+    <<: *servico
+    build: { context: ../../backend, args: { MODULE: fiscal-service } }
+    container_name: wc-fiscal-service
+    ports: ["8084:8084"]
+    environment:
+      <<: *servico-env
+      SERVER_PORT: 8084
+      SALES_SERVICE_URL: http://sales-service:8083
+      CUSTOMER_SERVICE_URL: http://customer-service:8081
+      PRODUCT_SERVICE_URL: http://product-service:8082
+
 networks:
   wc-net:
     name: wc-net

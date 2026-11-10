@@ -56,6 +56,12 @@ public class SegurancaConfig implements WebMvcConfigurer {
 
     @Bean
     @ConditionalOnMissingBean
+    public TokenServico tokenServico(JwtService jwt, SessaoStore sessoes, Clock clock) {
+        return new TokenServico(jwt, sessoes, clock);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }

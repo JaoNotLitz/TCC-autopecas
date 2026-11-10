@@ -37,4 +37,15 @@ confere "DELETE /vendas/{id} cancela" "$(curl -s -o /dev/null -w '%{http_code}' 
 confere "estoque insuficiente responde 409" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/vendas" -H "$auth" \
   -H 'Content-Type: application/json' -d "${venda/\"quantidade\":1/\"quantidade\":99999}")" 409
 
+# Venda finalizada vira nota "processando" no fiscal-service (sale.created pela sales-events-queue).
+final=$(curl -s -X POST "$G/vendas" -H "$auth" -H 'Content-Type: application/json' -d "${venda/orcamento/finalizada}")
+vid=$(sed -nE 's/^\{"id":([0-9]+),.*/\1/p' <<<"$final")
+nota=""
+for _ in $(seq 1 30); do
+  nota=$(curl -s "$G/notas?vendaId=$vid" -H "$auth")
+  grep -q '"status":"processando"' <<<"$nota" && break
+  sleep 1
+done
+confere "venda finalizada gera nota" "$(grep -o '"tipo":"NFCE"' <<<"$nota")" '"tipo":"NFCE"'
+
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

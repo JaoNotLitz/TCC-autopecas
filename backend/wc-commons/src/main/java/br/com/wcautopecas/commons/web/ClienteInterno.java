@@ -1,5 +1,6 @@
 package br.com.wcautopecas.commons.web;
 
+import br.com.wcautopecas.commons.seguranca.TokenServico;
 import br.com.wcautopecas.commons.seguranca.UsuarioAtual;
 import java.time.Duration;
 import org.slf4j.MDC;
@@ -16,6 +17,14 @@ public final class ClienteInterno {
     }
 
     public static RestClient criar(String baseUrl, Duration timeout) {
+        return criar(baseUrl, timeout, null);
+    }
+
+    /**
+     * Fora de uma requisição (listener de fila), usa o token do usuário técnico; dentro dela,
+     * repassa o token de quem chamou.
+     */
+    public static RestClient criar(String baseUrl, Duration timeout, TokenServico sistema) {
         var fabrica = new SimpleClientHttpRequestFactory();
         fabrica.setConnectTimeout((int) timeout.toMillis());
         fabrica.setReadTimeout((int) timeout.toMillis());
@@ -23,7 +32,12 @@ public final class ClienteInterno {
                 .baseUrl(baseUrl)
                 .requestFactory(fabrica)
                 .requestInterceptor((req, corpo, exec) -> {
-                    UsuarioAtual.opcional().ifPresent(u -> req.getHeaders().setBearerAuth(u.token()));
+                    var usuario = UsuarioAtual.opcional();
+                    if (usuario.isPresent()) {
+                        req.getHeaders().setBearerAuth(usuario.get().token());
+                    } else if (sistema != null) {
+                        req.getHeaders().setBearerAuth(sistema.token());
+                    }
                     String correlation = MDC.get(CorrelationIdFilter.MDC_KEY);
                     if (correlation != null) {
                         req.getHeaders().set(CorrelationIdFilter.HEADER, correlation);
