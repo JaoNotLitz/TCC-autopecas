@@ -243,7 +243,8 @@ class FiscalIT {
                 "chaveAcesso", "clienteId", "clienteNome", "clienteDocumento", "fornecedorId", "valorTotal",
                 "emitidaEm", "status", "vendaId", "notaReferenciadaId");
         assertThat(n.get("tipo").asText()).isEqualTo("NFCE");
-        assertThat(n.get("status").asText()).isEqualTo("processando");
+        // o simulador da SEFAZ pode autorizar antes desta leitura
+        assertThat(n.get("status").asText()).isIn("processando", "autorizada");
         assertThat(n.get("numero").asText()).matches("\\d{6}");
         assertThat(n.get("serie").asText()).isEqualTo(SERIE);
         assertThat(n.get("clienteNome").isNull()).isTrue();
@@ -396,7 +397,9 @@ class FiscalIT {
                 "itens", List.of(Map.of("produtoId", 8, "quantidade", 1))), vendedor);
         long devId = r.getBody().get("id").asLong();
         esperarStatus(devId, "autorizada");
-        assertThat(repo.itens(original.getId()).get(1).getQuantidadeDevolvida()).isEqualTo(1);
+        // o saldo da original é gravado logo depois do status; espera em vez de ler uma vez só
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(repo.itens(original.getId()).get(1).getQuantidadeDevolvida()).isEqualTo(1));
 
         r = chamar(HttpMethod.POST, "/api/notas/" + devId + "/cancelamento",
                 Map.of("justificativa", "Devolução lançada por engano"), admin);
@@ -405,7 +408,8 @@ class FiscalIT {
         esperar("inventory-updates-queue", 1, m -> m.path("referenciaId").asLong() == devId
                 && "decrease".equals(m.path("type").asText()) && "cancellation".equals(m.path("referenciaType").asText())
                 && m.path("produtoId").asLong() == 8);
-        assertThat(repo.itens(original.getId()).get(1).getQuantidadeDevolvida()).isZero();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(repo.itens(original.getId()).get(1).getQuantidadeDevolvida()).isZero());
         verify(integracoes, never()).cancelarVenda(anyLong(), eq(devId));
     }
 
@@ -430,9 +434,11 @@ class FiscalIT {
         esperar("inventory-updates-queue", 1, m -> m.path("referenciaId").asLong() == devId
                 && "increase".equals(m.path("type").asText()) && "return".equals(m.path("referenciaType").asText())
                 && m.path("quantidade").asLong() == 2);
-        NotaLinha base = repo.itens(original.getId()).get(0);
-        assertThat(base.getQuantidadeDevolvida()).isEqualTo(2);
-        assertThat(base.getQuantidadeEmDevolucao()).isZero();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            NotaLinha base = repo.itens(original.getId()).get(0);
+            assertThat(base.getQuantidadeDevolvida()).isEqualTo(2);
+            assertThat(base.getQuantidadeEmDevolucao()).isZero();
+        });
 
         // vendidas 3 do produto 7 (duas linhas), 2 em devolução: sobra 1
         r = chamar(HttpMethod.POST, "/api/notas/devolucao", Map.of("notaReferenciadaId", original.getId(),
