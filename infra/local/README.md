@@ -40,6 +40,7 @@ serviços também recebem como variáveis de ambiente.
   o `sales-events-topic` da decisão A2 e as assinaturas (com filter policy na `email-queue`).
 - `30-s3.sh`: os 4 buckets, com CORS para o front e versionamento em `wc-documents-bucket` e `wc-backups`.
 - `40-secrets-ses.sh`: `wc-jwt-secret` (64 bytes aleatórios), `wc-redis-auth-token` e a identidade SES.
+- `45-certificado.sh`: certificado A1 **autoassinado de teste** (OpenSSL, 365 dias) em `wc-sefaz-certificate` como `{"pfx": base64, "senha": ...}`. Só serve para o simulador da SEFAZ; os testes geram a versão vencida com o `keytool`.
 - `50-gateway.sh`: a Lambda `wc-jwt-authorizer` e a API REST `wc-autopecas-api` (id fixo `wcapi`, stage `local`),
   com as rotas da seção 3.2, respostas de erro do gateway no formato da seção 5.0 e o usage plan.
 

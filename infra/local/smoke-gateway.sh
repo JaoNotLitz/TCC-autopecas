@@ -47,5 +47,12 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 confere "venda finalizada gera nota" "$(grep -o '"tipo":"NFCE"' <<<"$nota")" '"tipo":"NFCE"'
+# O job generate_xml assina o XML e grava a chave de acesso (EPB-08).
+for _ in $(seq 1 30); do
+  nota=$(curl -s "$G/notas?vendaId=$vid" -H "$auth")
+  grep -qE '"chaveAcesso":"[0-9]{44}"' <<<"$nota" && break
+  sleep 1
+done
+confere "nota ganha chave de acesso" "$(grep -cE '"chaveAcesso":"[0-9]{44}"' <<<"$nota")" 1
 
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

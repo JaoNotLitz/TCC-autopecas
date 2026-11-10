@@ -28,6 +28,12 @@ public class NotaItem {
     private String clienteNome;
     private String clienteDocumento;
     private String clienteUf;
+    private String clienteCidade;
+    private String clienteEmail;
+    /** Da venda, para o grupo {@code pag} e o {@code indPres} do XML. */
+    private String metodoPagamento;
+    private String bandeira;
+    private String modalidade;
     private Long fornecedorId;
     private Long notaReferenciadaId;
     private String chaveReferenciada;
