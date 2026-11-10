@@ -59,6 +59,14 @@ wc:
     fila-vendas: ${QUEUE_SALES_EVENTS:sales-events-queue}
     fila-jobs: ${QUEUE_FISCAL_JOBS:fiscal-jobs-queue}
     fila-eventos: ${QUEUE_FISCAL_EVENTS:fiscal-events-queue}
+    fila-sefaz: ${QUEUE_SEFAZ:sefaz-queue}
+    fila-documentos: ${QUEUE_DOCUMENT_EVENTS:document-events-queue}
+    fila-estoque: ${QUEUE_INVENTORY_UPDATES:inventory-updates-queue}
+    bucket-documentos: ${BUCKET_DOCUMENTS:wc-documents-bucket}
+    topico-sistema: ${TOPIC_SYSTEM_NOTIFICATIONS:system-notifications-topic}
+    secret-certificado: ${SECRET_SEFAZ_CERT:wc-sefaz-certificate}
+    sefaz:
+      url: ${SEFAZ_URL:http://sefaz-mock:8080}
     sales-url: ${SALES_SERVICE_URL:http://sales-service:8083}
     customer-url: ${CUSTOMER_SERVICE_URL:http://customer-service:8081}
     product-url: ${PRODUCT_SERVICE_URL:http://product-service:8082}

@@ -39,9 +39,11 @@ public class NotaService {
     private final DynamoDbClient dynamo;
     private final FiscalProperties props;
     private final Clock clock;
+    private final SaldoDevolucao saldo;
 
     public NotaService(NotaRepository repo, EventoRepository eventos, FiscalMensagens mensagens, IdGenerator ids,
-            DynamoDbClient dynamo, FiscalProperties props, Clock clock) {
+            DynamoDbClient dynamo, FiscalProperties props, Clock clock, SaldoDevolucao saldo) {
+        this.saldo = saldo;
         this.repo = repo;
         this.eventos = eventos;
         this.mensagens = mensagens;
@@ -103,6 +105,7 @@ public class NotaService {
         if (!repo.salvarSeStatus(n, "rejeitada")) {
             throw new ConflitoException("A nota foi alterada por outra operação. Atualize e tente de novo");
         }
+        saldo.aplicar(n, SaldoDevolucao.Evento.REENVIADA); // a rejeição tinha liberado o "em devolução"
         mensagens.gerarXml(n);
         return NotaDto.de(n);
     }

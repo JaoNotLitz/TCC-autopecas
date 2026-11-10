@@ -11,7 +11,7 @@ O contrato da API é o do front React (`dinastiadoge/tcc`): ids numéricos, list
 | `customer-service` | 8081 | EPB-03 | pronto (CRUD, busca, eventos e estatísticas de compras) |
 | `product-service` | 8082 | EPB-04 e EPB-05 | pronto (catálogo, resumo, ajustes, listener de estoque e alertas) |
 | `sales-service` | 8083 | EPB-06 | pronto (venda e orçamento, validação de cliente e estoque, reserva, `sale.created`, `sale_completed`) |
-| `fiscal-service` | 8084 | EPB-07 e EPB-08 | pronto (nota a partir da venda, consulta, cancelamento, inutilização, devolução e reenvio; XML 4.00 assinado e validado no XSD oficial, no S3 e na `sefaz-queue`; SEFAZ no EPB-09) |
+| `fiscal-service` | 8084 | EPB-07 a EPB-09 | pronto (nota a partir da venda, consulta, cancelamento, inutilização, devolução e reenvio; XML 4.00 assinado e validado no XSD oficial, no S3; autorização no simulador da SEFAZ com consulta de recibo, rejeição, retentativas, DLQ e baixa de estoque) |
 | `wc-jwt-authorizer` | Lambda | EPB-02 | pronto (o gateway e as rotas estão em `infra/local/init/ready.d/50-gateway.sh`) |
 
 ## Rodar

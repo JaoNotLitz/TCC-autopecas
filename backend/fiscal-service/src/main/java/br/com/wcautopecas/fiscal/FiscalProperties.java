@@ -37,6 +37,32 @@ public class FiscalProperties {
     private String urlQrCode = "https://www.homologacao.nfce.fazenda.sp.gov.br/NFCeConsultaPublica/Paginas/ConsultaQRCode.aspx";
     private String urlChave = "https://www.homologacao.nfce.fazenda.sp.gov.br/consulta";
     private Emitente emitente = new Emitente();
+    // EPB-09: integração com a SEFAZ (simulador no perfil local)
+    private String filaDocumentos = "document-events-queue";
+    private String filaEstoque = "inventory-updates-queue";
+    private Sefaz sefaz = new Sefaz();
+
+    @Data
+    public static class Sefaz {
+        /** Base dos webservices; cada serviço fica em {base}/ws/{Servico}. Local: o sefaz-mock. */
+        private String url = "http://sefaz-mock:8080";
+        /** URL própria por serviço (opcional), ex.: NFeAutorizacao4 → https://... */
+        private java.util.Map<String, String> urls = new java.util.HashMap<>();
+        private Duration timeout = Duration.ofSeconds(60);
+        /** Esperas entre as consultas do recibo (HU-B09.3). */
+        private java.util.List<Duration> esperasConsulta = java.util.List.of(Duration.ofSeconds(5),
+                Duration.ofSeconds(10), Duration.ofSeconds(20));
+        /** Visibility da mensagem antes da 2ª e da 3ª tentativa depois de erro de comunicação (HU-B09.5). */
+        private java.util.List<Duration> esperasRetentativa = java.util.List.of(Duration.ofMinutes(1),
+                Duration.ofMinutes(5));
+        /** Atraso da mensagem devolvida à fila quando o lote segue em processamento. */
+        private Duration atrasoReenvio = Duration.ofSeconds(60);
+        private int maxTentativas = 3;
+
+        public String endpoint(String servico) {
+            return urls.getOrDefault(servico, url.replaceAll("/+$", "") + "/ws/" + servico);
+        }
+    }
 
     /** Dados da loja (fictícios), usados no grupo {@code emit}. */
     @Data

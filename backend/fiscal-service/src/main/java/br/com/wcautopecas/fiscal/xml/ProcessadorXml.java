@@ -8,6 +8,7 @@ import br.com.wcautopecas.fiscal.FiscalProperties;
 import br.com.wcautopecas.fiscal.nota.NotaItem;
 import br.com.wcautopecas.fiscal.nota.NotaLinha;
 import br.com.wcautopecas.fiscal.nota.NotaRepository;
+import br.com.wcautopecas.fiscal.nota.SaldoDevolucao;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -49,10 +50,12 @@ public class ProcessadorXml {
     private final IdempotencyGuard avisos;
     private final FiscalProperties props;
     private final Clock clock;
+    private final SaldoDevolucao saldo;
 
     public ProcessadorXml(NotaRepository repo, NfeXmlBuilder builder, AssinadorXml assinador, ValidadorXsd validador,
             CertificadoA1 certificado, S3Client s3, Outbox outbox, EventPublisher publisher, IdempotencyGuard avisos,
-            FiscalProperties props, Clock clock) {
+            FiscalProperties props, Clock clock, SaldoDevolucao saldo) {
+        this.saldo = saldo;
         this.repo = repo;
         this.builder = builder;
         this.assinador = assinador;
@@ -134,7 +137,9 @@ public class ProcessadorXml {
             n.setStatus("rejeitada");
             n.setCodigoStatus("XSD");
             n.setMotivoRejeicao(limitar(erro.get()));
-            repo.salvarSeStatus(n, "processando");
+            if (repo.salvarSeStatus(n, "processando")) {
+                saldo.aplicar(n, SaldoDevolucao.Evento.REJEITADA);
+            }
             return Resultado.REJEITADA_XSD;
         }
 
