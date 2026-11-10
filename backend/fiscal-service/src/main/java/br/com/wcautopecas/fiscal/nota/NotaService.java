@@ -31,6 +31,7 @@ public class NotaService {
     public static final Set<String> STATUS = Set.of("processando", "autorizada", "cancelada", "rejeitada");
     public static final Set<String> TIPOS = Set.of("NFE", "NFCE", "DEVOLUCAO", "ENTRADA");
     static final int JUSTIFICATIVA_MINIMA = 15;
+    static final java.time.ZoneId FUSO_LOJA = java.time.ZoneId.of("America/Sao_Paulo");
 
     private final NotaRepository repo;
     private final EventoRepository eventos;
@@ -60,8 +61,9 @@ public class NotaService {
         if (tipo != null && !tipo.isBlank() && !TIPOS.contains(tipo)) {
             throw invalido("tipo", "Tipo inválido");
         }
-        String inicio = de == null || de.isBlank() ? null : data(de, "de").toString();
-        String fim = ate == null || ate.isBlank() ? null : data(ate, "ate").plusDays(1).toString();
+        // de/ate são dias no fuso da loja; emitidaEm é um instante UTC (uma venda às 22h ainda é "hoje").
+        String inicio = de == null || de.isBlank() ? null : inicioDoDia(data(de, "de"));
+        String fim = ate == null || ate.isBlank() ? null : inicioDoDia(data(ate, "ate").plusDays(1));
         Stream<NotaItem> fonte;
         if (vendaId != null) {
             fonte = repo.daVenda(vendaId).stream();
@@ -159,6 +161,10 @@ public class NotaService {
 
     private static boolean vazio(String s) {
         return s == null || s.isBlank();
+    }
+
+    static String inicioDoDia(LocalDate dia) {
+        return dia.atStartOfDay(FUSO_LOJA).toInstant().toString();
     }
 
     private static LocalDate data(String valor, String campo) {

@@ -303,11 +303,13 @@ class FiscalIT {
 
     @Test
     void listarComFiltros() {
-        NotaItem n = notaAutorizada("NFE", Instant.now());
-        String hoje = n.getEmitidaEm().substring(0, 10);
-        var lista = toList(chamar(HttpMethod.GET, "/api/notas?status=autorizada&de=" + hoje + "&ate=" + hoje, null,
+        // 22h30 de 09/03 em São Paulo, já 10/03 em UTC: o período é o dia da loja.
+        NotaItem n = notaAutorizada("NFE", Instant.parse("2026-03-10T01:30:00Z"));
+        var lista = toList(chamar(HttpMethod.GET, "/api/notas?status=autorizada&de=2026-03-09&ate=2026-03-09", null,
                 vendedor).getBody());
         assertThat(lista).extracting(x -> x.get("id").asLong()).contains(n.getId());
+        assertThat(toList(chamar(HttpMethod.GET, "/api/notas?de=2026-03-10&ate=2026-03-10", null, vendedor).getBody()))
+                .extracting(x -> x.get("id").asLong()).doesNotContain(n.getId());
         assertThat(lista).allMatch(x -> "autorizada".equals(x.get("status").asText()));
         lista = toList(chamar(HttpMethod.GET, "/api/notas?tipo=NFE", null, vendedor).getBody());
         assertThat(lista).extracting(x -> x.get("id").asLong()).contains(n.getId());

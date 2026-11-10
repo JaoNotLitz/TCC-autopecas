@@ -132,6 +132,17 @@ services:
       # O link do ZIP vai por e-mail e é aberto no navegador, então aponta para o LocalStack visto do host.
       S3_ENDERECO_PUBLICO: http://localhost:4566
 
+  # CSV do Painel Fiscal (GET /api/notas/relatorio): pede a listagem ao fiscal-service.
+  reports-service:
+    <<: *servico
+    build: { context: ../../backend, args: { MODULE: reports-service } }
+    container_name: wc-reports-service
+    ports: ["8087:8087"]
+    environment:
+      <<: *servico-env
+      SERVER_PORT: 8087
+      FISCAL_SERVICE_URL: http://fiscal-service:8084
+
   # Simulador da SEFAZ (WireMock). Os cenários estão em sefaz-mock/README.md.
   sefaz-mock:
     image: wiremock/wiremock:3.9.2

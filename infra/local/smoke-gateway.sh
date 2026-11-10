@@ -109,4 +109,12 @@ confere "chave repetida responde 409" "$(curl -s -o /dev/null -w '%{http_code}' 
 confere "POST /notas/lote-contador" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/lote-contador" -H "$auth")" 204
 confere "lote repetido no mês responde 409" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/lote-contador" -H "$auth")" 409
 
+# Relatório do Painel Fiscal (EPB-14): CSV com as mesmas notas de GET /notas no período.
+hoje=$(TZ=America/Sao_Paulo date +%F)
+csv=$(curl -s -D /tmp/relatorio.h "$G/notas/relatorio?status=cancelada&de=$hoje&ate=$hoje" -H "$auth")
+confere "GET /notas/relatorio devolve CSV" "$(grep -ci '^content-type: text/csv' /tmp/relatorio.h)" 1
+lista=$(curl -s "$G/notas?status=cancelada&de=$hoje&ate=$hoje" -H "$auth" | grep -o '"id":' | wc -l)
+confere "listagem acha a cancelada de hoje" "$([ "$lista" -ge 1 ] && echo sim)" sim
+confere "relatório tem as notas da listagem" "$(($(wc -l <<<"$csv") - 1))" "$lista"
+
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

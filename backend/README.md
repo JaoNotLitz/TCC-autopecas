@@ -14,6 +14,7 @@ O contrato da API é o do front React (`dinastiadoge/tcc`): ids numéricos, list
 | `fiscal-service` | 8084 | EPB-07 a EPB-10 | pronto (nota a partir da venda, consulta, cancelamento, inutilização, devolução e reenvio; XML 4.00 assinado e validado no XSD oficial, no S3; autorização no simulador da SEFAZ com consulta de recibo, rejeição, retentativas, DLQ e baixa de estoque; cancelamento 110111 e inutilização homologados na SEFAZ, com estoque de volta e venda cancelada) |
 | `entry-service` | 8085 | EPB-11 | pronto (nota de entrada do fornecedor pelo formulário ou pela prévia do XML; resolve produtos pelo código, grava o fornecedor, vira nota `ENTRADA` no fiscal-service e soma o estoque) |
 | `document-service` | 8086 | EPB-13 | pronto (DANFE em PDF da NF-e em A4 e do cupom NFC-e 80 mm com QR Code, gerado ao autorizar e sob demanda; carimbo "CANCELADA"; download do XML; lote mensal de XMLs em ZIP com link de 7 dias por e-mail ao contador) |
+| `reports-service` | 8087 | EPB-14 | relatório do Painel Fiscal pronto (`GET /api/notas/relatorio`: CSV com as mesmas notas e filtros de `GET /api/notas`, mês corrente por padrão); dashboard e relatórios de vendas/estoque são extras e ficam para o fim |
 | `wc-jwt-authorizer` | Lambda | EPB-02 | pronto (o gateway e as rotas estão em `infra/local/init/ready.d/50-gateway.sh`) |
 
 ## Rodar
