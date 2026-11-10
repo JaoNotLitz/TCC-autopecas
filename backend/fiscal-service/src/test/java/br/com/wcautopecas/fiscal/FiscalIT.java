@@ -6,6 +6,8 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.timeout;
 import static org.mockito.Mockito.verify;
 
 import br.com.wcautopecas.commons.seguranca.JwtService;
@@ -92,6 +94,10 @@ class FiscalIT {
     SecretsManagerClient secrets;
     @Autowired
     CertificadoA1 certificado;
+    @Autowired
+    br.com.wcautopecas.fiscal.evento.EventoRepository eventos;
+    @Autowired
+    br.com.wcautopecas.fiscal.nota.Numerador numerador;
     @MockBean
     Integracoes integracoes;
 
@@ -201,6 +207,8 @@ class FiscalIT {
         n.setEmitidaEm(autorizadaEm.toString());
         n.setAutorizadaEm(autorizadaEm.toString());
         n.setTentativasEnvio(0);
+        n.setProtocolo("135" + String.format("%012d", vendaId % 1_000_000_000_000L));
+        n.setXmlPath("s3://wc-documents-bucket/" + tipo + "/2026/11/" + n.getChaveAcesso() + ".xml");
         NotaLinha a = linha(n.getId(), 1, 7, 2, "89.90");
         NotaLinha b = linha(n.getId(), 2, 8, 1, "10.00");
         NotaLinha c = linha(n.getId(), 3, 7, 1, "89.90");
@@ -235,7 +243,8 @@ class FiscalIT {
                 "chaveAcesso", "clienteId", "clienteNome", "clienteDocumento", "fornecedorId", "valorTotal",
                 "emitidaEm", "status", "vendaId", "notaReferenciadaId");
         assertThat(n.get("tipo").asText()).isEqualTo("NFCE");
-        assertThat(n.get("status").asText()).isEqualTo("processando");
+        // o simulador da SEFAZ pode autorizar antes desta leitura
+        assertThat(n.get("status").asText()).isIn("processando", "autorizada");
         assertThat(n.get("numero").asText()).matches("\\d{6}");
         assertThat(n.get("serie").asText()).isEqualTo(SERIE);
         assertThat(n.get("clienteNome").isNull()).isTrue();
@@ -324,16 +333,84 @@ class FiscalIT {
         r = chamar(HttpMethod.POST, url, ok, admin);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody().get("status").asText()).isEqualTo("processando");
-        esperar("fiscal-events-queue", 1, m -> m.path("notaId").asLong() == n.getId()
-                && "cancelamento".equals(m.path("eventType").asText()) && m.hasNonNull("eventoId")
-                && n.getChaveAcesso().equals(m.path("chaveAcesso").asText()));
 
-        assertThat(chamar(HttpMethod.POST, url, ok, admin).getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+        // FiscalEventsListener → evento 110111 assinado → simulador responde 135
+        NotaItem cancelada = esperarStatus(n.getId(), "cancelada");
+        assertThat(cancelada.getCanceladaEm()).isNotNull();
+        var evento = eventos.porId(cancelada.getCancelamentoId()).orElseThrow();
+        assertThat(evento.getStatus()).isEqualTo("concluido");
+        assertThat(evento.getProtocolo()).matches("135\\d{12}");
+        assertThat(evento.getXmlPath()).endsWith(n.getChaveAcesso() + "-cancelamento.xml");
+        String proc = s3.getObjectAsBytes(b -> b.bucket("wc-documents-bucket")
+                .key(evento.getXmlPath().replace("s3://wc-documents-bucket/", ""))).asUtf8String();
+        assertThat(proc).contains("<procEventoNFe").contains("<tpEvento>110111</tpEvento>").contains("<Signature")
+                .contains("<retEvento").contains("Id=\"ID110111" + n.getChaveAcesso() + "01\"");
+        // produto 7 em duas linhas (2 + 1) e produto 8 (1): um increase por produto
+        var voltas = esperar("inventory-updates-queue", 2, m -> m.path("referenciaId").asLong() == n.getId()
+                && "cancellation".equals(m.path("referenciaType").asText()));
+        assertThat(voltas).allMatch(m -> "increase".equals(m.path("type").asText()));
+        assertThat(voltas).anyMatch(m -> m.path("produtoId").asLong() == 7 && m.path("quantidade").asLong() == 3);
+        verify(integracoes, timeout(5000)).cancelarVenda(n.getVendaId(), n.getId());
+        assertThat(chamar(HttpMethod.POST, url, ok, admin).getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+
+        NotaItem emCurso = notaAutorizada("NFCE", Instant.now());
+        emCurso.setStatus("processando");
+        emCurso.setCancelamentoId(999_999L);
+        repo.salvarSeStatus(emCurso, "autorizada");
+        assertThat(chamar(HttpMethod.POST, "/api/notas/" + emCurso.getId() + "/cancelamento", ok, admin)
+                .getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
 
         NotaItem velha = notaAutorizada("NFCE", Instant.now().minus(Duration.ofHours(25)));
         r = chamar(HttpMethod.POST, "/api/notas/" + velha.getId() + "/cancelamento", ok, admin);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         assertThat(r.getBody().get("message").asText()).isEqualTo("Prazo de cancelamento expirado");
+    }
+
+    @Test
+    void cancelamentoRejeitadoVoltaParaAutorizada() {
+        NotaItem n = notaAutorizada("NFE", Instant.now());
+        // "rejeitar" na justificativa faz o simulador responder 218
+        var r = chamar(HttpMethod.POST, "/api/notas/" + n.getId() + "/cancelamento",
+                Map.of("justificativa", "Teste para rejeitar o cancelamento"), admin);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() -> {
+            NotaItem atual = repo.porId(n.getId()).orElseThrow();
+            assertThat(atual.getStatus()).isEqualTo("autorizada");
+            assertThat(atual.getCancelamentoId()).isNull();
+        });
+        var lista = toList(chamar(HttpMethod.GET, "/api/notas?status=autorizada", null, vendedor).getBody());
+        assertThat(lista).anyMatch(x -> x.get("id").asLong() == n.getId());
+        JsonNode completa = chamar(HttpMethod.GET, "/internal/notas/" + n.getId(), null, admin).getBody();
+        JsonNode ev = completa.get("eventos").get(0);
+        assertThat(ev.get("tipo").asText()).isEqualTo("CANCELAMENTO");
+        assertThat(ev.get("status").asText()).isEqualTo("rejeitado");
+        assertThat(ev.get("codigoStatus").asText()).isEqualTo("218");
+        assertThat(ev.get("motivo").asText()).contains("cancelada");
+        assertThat(mensagens("inventory-updates-queue")).noneMatch(m -> m.path("referenciaId").asLong() == n.getId());
+        verify(integracoes, never()).cancelarVenda(n.getVendaId(), n.getId());
+    }
+
+    @Test
+    void cancelamentoDeDevolucaoDesfazODevolvido() {
+        NotaItem original = notaAutorizada("NFE", Instant.now());
+        var r = chamar(HttpMethod.POST, "/api/notas/devolucao", Map.of("notaReferenciadaId", original.getId(),
+                "itens", List.of(Map.of("produtoId", 8, "quantidade", 1))), vendedor);
+        long devId = r.getBody().get("id").asLong();
+        esperarStatus(devId, "autorizada");
+        // o saldo da original é gravado logo depois do status; espera em vez de ler uma vez só
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(repo.itens(original.getId()).get(1).getQuantidadeDevolvida()).isEqualTo(1));
+
+        r = chamar(HttpMethod.POST, "/api/notas/" + devId + "/cancelamento",
+                Map.of("justificativa", "Devolução lançada por engano"), admin);
+        assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
+        esperarStatus(devId, "cancelada");
+        esperar("inventory-updates-queue", 1, m -> m.path("referenciaId").asLong() == devId
+                && "decrease".equals(m.path("type").asText()) && "cancellation".equals(m.path("referenciaType").asText())
+                && m.path("produtoId").asLong() == 8);
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() ->
+                assertThat(repo.itens(original.getId()).get(1).getQuantidadeDevolvida()).isZero());
+        verify(integracoes, never()).cancelarVenda(anyLong(), eq(devId));
     }
 
     @Test
@@ -357,9 +434,11 @@ class FiscalIT {
         esperar("inventory-updates-queue", 1, m -> m.path("referenciaId").asLong() == devId
                 && "increase".equals(m.path("type").asText()) && "return".equals(m.path("referenciaType").asText())
                 && m.path("quantidade").asLong() == 2);
-        NotaLinha base = repo.itens(original.getId()).get(0);
-        assertThat(base.getQuantidadeDevolvida()).isEqualTo(2);
-        assertThat(base.getQuantidadeEmDevolucao()).isZero();
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            NotaLinha base = repo.itens(original.getId()).get(0);
+            assertThat(base.getQuantidadeDevolvida()).isEqualTo(2);
+            assertThat(base.getQuantidadeEmDevolucao()).isZero();
+        });
 
         // vendidas 3 do produto 7 (duas linhas), 2 em devolução: sobra 1
         r = chamar(HttpMethod.POST, "/api/notas/devolucao", Map.of("notaReferenciadaId", original.getId(),
@@ -402,8 +481,18 @@ class FiscalIT {
                 "numeroFinal", "justificativa", "protocolo", "registradaEm");
         assertThat(r.getBody().get("protocolo").isNull()).isTrue();
         long id = r.getBody().get("id").asLong();
-        esperar("fiscal-events-queue", 1, m -> m.path("eventoId").asLong() == id
-                && "inutilizacao".equals(m.path("eventType").asText()));
+        // FiscalEventsListener → inutNFe assinado → simulador responde 102
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(eventos.porId(id).orElseThrow().getStatus()).isEqualTo("concluido"));
+        var ev = eventos.porId(id).orElseThrow();
+        assertThat(ev.getProtocolo()).matches("135\\d{12}");
+        String proc = s3.getObjectAsBytes(b -> b.bucket("wc-documents-bucket")
+                .key(ev.getXmlPath().replace("s3://wc-documents-bucket/", ""))).asUtf8String();
+        assertThat(ev.getXmlPath()).contains("/INUTILIZACAO/").endsWith("/" + id + ".xml");
+        assertThat(proc).contains("<ProcInutNFe").contains("<Signature").contains("<cStat>102</cStat>")
+                .contains("<nNFIni>" + (num + 10) + "</nNFIni>");
+        // o contador da série passou da faixa inutilizada
+        assertThat(Long.parseLong(numerador.proximo("55", serie))).isGreaterThan(num + 15);
 
         r = chamar(HttpMethod.POST, "/api/inutilizacoes", Map.of("serie", serie, "numeroInicial", num + 15,
                 "numeroFinal", num + 20, "justificativa", just), admin);
@@ -417,7 +506,15 @@ class FiscalIT {
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
 
         var lista = toList(chamar(HttpMethod.GET, "/api/inutilizacoes", null, vendedor).getBody());
-        assertThat(lista.get(0).get("id").asLong()).isEqualTo(id);
+        assertThat(lista).anyMatch(x -> x.get("id").asLong() == id && x.get("protocolo").asText().startsWith("135"));
+
+        // "rejeitar" na justificativa faz o simulador responder 256
+        r = chamar(HttpMethod.POST, "/api/inutilizacoes", Map.of("serie", serie, "numeroInicial", num + 40,
+                "numeroFinal", num + 41, "justificativa", "Faixa para rejeitar no simulador"), admin);
+        long rejeitada = r.getBody().get("id").asLong();
+        await().atMost(Duration.ofSeconds(30)).untilAsserted(() ->
+                assertThat(eventos.porId(rejeitada).orElseThrow().getStatus()).isEqualTo("rejeitado"));
+        assertThat(eventos.porId(rejeitada).orElseThrow().getCodigoStatus()).isEqualTo("256");
     }
 
     @Test

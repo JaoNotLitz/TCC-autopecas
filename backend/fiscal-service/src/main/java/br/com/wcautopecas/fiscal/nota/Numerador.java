@@ -18,8 +18,16 @@ public class Numerador {
     }
 
     public String proximo(String modelo, String serie) {
-        String recurso = ("65".equals(modelo) ? "NFCE" : "NFE") + "-" + modelo + "-" + serie;
-        return String.format("%06d", ids.proximo(recurso));
+        return String.format("%06d", ids.proximo(recurso(modelo, serie)));
+    }
+
+    /** HU-B10.2 RF04: depois de inutilizar até {@code numero}, a próxima nota sai acima dele. */
+    public void pularAte(String modelo, String serie, long numero) {
+        ids.garantirMinimo(recurso(modelo, serie), numero);
+    }
+
+    static String recurso(String modelo, String serie) {
+        return ("65".equals(modelo) ? "NFCE" : "NFE") + "-" + modelo + "-" + serie;
     }
 
     public static String modelo(String tipo) {

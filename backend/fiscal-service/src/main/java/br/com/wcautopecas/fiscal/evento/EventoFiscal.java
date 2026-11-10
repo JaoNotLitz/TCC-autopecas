@@ -15,7 +15,7 @@ public class EventoFiscal {
 
     private Long id;
     private String tipo;
-    /** processando | homologado | rejeitado */
+    /** processando | concluido | rejeitado */
     private String status;
     private Long notaId;
     private String modelo;
@@ -27,6 +27,10 @@ public class EventoFiscal {
     private String registradoEm;
     private String protocolo;
     private String motivoRejeicao;
+    private String codigoStatus;
+    private Integer tentativasEnvio;
+    /** Retorno da SEFAZ no S3 ({@code s3://bucket/chave}). */
+    private String xmlPath;
 
     @DynamoDbPartitionKey
     public Long getId() {

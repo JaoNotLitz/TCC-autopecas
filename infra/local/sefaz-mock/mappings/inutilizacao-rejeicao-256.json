@@ -1,0 +1,23 @@
+{
+  "name": "inutilizacao-rejeicao-256",
+  "priority": 5,
+  "request": {
+    "method": "POST",
+    "urlPath": "/ws/NFeInutilizacao4",
+    "bodyPatterns": [
+      {
+        "matches": "(?s).*<xJust>[^<]*(?i:rejeitar)[^<]*</xJust>.*"
+      }
+    ]
+  },
+  "response": {
+    "headers": {
+      "Content-Type": "application/soap+xml; charset=utf-8"
+    },
+    "transformers": [
+      "response-template"
+    ],
+    "status": 200,
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><soap12:Envelope xmlns:soap12=\"http://www.w3.org/2003/05/soap-envelope\"><soap12:Body><nfeResultMsg xmlns=\"http://www.portalfiscal.inf.br/nfe/wsdl/NFeInutilizacao4\"><retInutNFe versao=\"4.00\" xmlns=\"http://www.portalfiscal.inf.br/nfe\"><infInut><tpAmb>2</tpAmb><verAplic>WC-SEFAZ-MOCK</verAplic><cStat>256</cStat><xMotivo>Rejeicao: Uma parte da faixa de numeracao ja esta utilizada</xMotivo><cUF>35</cUF><dhRecbto>{{now timezone='America/Sao_Paulo' format=\"yyyy-MM-dd'T'HH:mm:ssXXX\"}}</dhRecbto></infInut></retInutNFe></nfeResultMsg></soap12:Body></soap12:Envelope>"
+  }
+}

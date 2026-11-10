@@ -1,8 +1,6 @@
 package br.com.wcautopecas.fiscal.sefaz;
 
-import br.com.wcautopecas.commons.mensageria.EventPublisher;
 import br.com.wcautopecas.commons.mensageria.Outbox;
-import br.com.wcautopecas.commons.seguranca.TokenServico;
 import br.com.wcautopecas.fiscal.FiscalProperties;
 import br.com.wcautopecas.fiscal.nota.NotaItem;
 import br.com.wcautopecas.fiscal.nota.NotaLinha;
@@ -44,21 +42,21 @@ public class AutorizacaoService {
     private final S3Client s3;
     private final SqsClient sqs;
     private final Outbox outbox;
-    private final EventPublisher publisher;
+    private final EfeitosFiscais efeitos;
     private final ObjectMapper mapper;
     private final FiscalProperties props;
     private final Clock clock;
     private final SaldoDevolucao saldo;
 
     public AutorizacaoService(NotaRepository repo, SefazClient sefaz, S3Client s3, SqsClient sqs, Outbox outbox,
-            EventPublisher publisher, ObjectMapper mapper, FiscalProperties props, Clock clock, SaldoDevolucao saldo) {
+            EfeitosFiscais efeitos, ObjectMapper mapper, FiscalProperties props, Clock clock, SaldoDevolucao saldo) {
         this.saldo = saldo;
         this.repo = repo;
         this.sefaz = sefaz;
         this.s3 = s3;
         this.sqs = sqs;
         this.outbox = outbox;
-        this.publisher = publisher;
+        this.efeitos = efeitos;
         this.mapper = mapper;
         this.props = props;
         this.clock = clock;
@@ -142,11 +140,11 @@ public class AutorizacaoService {
         Map<Long, Long> somas = new LinkedHashMap<>();
         linhas.forEach(l -> somas.merge(l.getProdutoId(), l.getQuantidade(), Long::sum));
         if ("DEVOLUCAO".equals(n.getTipo())) {
-            somas.forEach((produto, q) -> estoque("increase", produto, q, n.getId(), "return",
+            somas.forEach((produto, q) -> efeitos.estoque("increase", produto, q, n.getId(), "return",
                     "Devolução NF-e " + n.getNumero()));
             saldo.aplicar(n, SaldoDevolucao.Evento.AUTORIZADA);
         } else if (n.getVendaId() != null) {
-            somas.forEach((produto, q) -> estoque("decrease", produto, q, n.getVendaId(), "sale",
+            somas.forEach((produto, q) -> efeitos.estoque("decrease", produto, q, n.getVendaId(), "sale",
                     "NF-e " + n.getNumero() + " autorizada"));
         }
         Map<String, Object> doc = new LinkedHashMap<>();
@@ -168,7 +166,7 @@ public class AutorizacaoService {
         }
         log.warn("nota {} {} rejeitada pela SEFAZ: {} {}", n.getId(), n.getNumero(), cStat, motivo);
         saldo.aplicar(n, SaldoDevolucao.Evento.REJEITADA);
-        avisar("medium", "Nota " + n.getNumero() + " (id " + n.getId() + ") rejeitada: " + cStat + " " + motivo);
+        efeitos.avisar("medium", "Nota " + n.getNumero() + " (id " + n.getId() + ") rejeitada: " + cStat + " " + motivo);
         return Resultado.REJEITADA;
     }
 
@@ -178,7 +176,7 @@ public class AutorizacaoService {
         log.warn("falha de comunicação com a SEFAZ na nota {} (tentativa {}): {}", n.getId(), recebimento,
                 e.getMessage());
         if (recebimento >= props.getSefaz().getMaxTentativas()) {
-            avisar("high", "SEFAZ indisponível: nota " + n.getNumero() + " (id " + n.getId() + ") foi para a DLQ após "
+            efeitos.avisar("high", "SEFAZ indisponível: nota " + n.getNumero() + " (id " + n.getId() + ") foi para a DLQ após "
                     + recebimento + " tentativas. " + e.getMessage());
         }
     }
@@ -205,32 +203,6 @@ public class AutorizacaoService {
             log.info("lote da nota {} segue em processamento; nova consulta na tentativa {}", n.getId(), tentativa);
         } catch (Exception e) {
             throw new IllegalStateException("não foi possível devolver a nota " + n.getId() + " para a fila", e);
-        }
-    }
-
-    private void estoque(String tipo, long produto, long q, long referencia, String referenciaType, String motivo) {
-        Map<String, Object> op = new LinkedHashMap<>();
-        op.put("type", tipo);
-        op.put("produtoId", produto);
-        op.put("quantidade", q);
-        op.put("referenciaId", referencia);
-        op.put("referenciaType", referenciaType);
-        op.put("usuarioId", TokenServico.USUARIO_SISTEMA);
-        op.put("motivo", motivo);
-        outbox.fila(props.getFilaEstoque(), tipo, op);
-    }
-
-    private void avisar(String severidade, String mensagem) {
-        Map<String, Object> msg = new LinkedHashMap<>();
-        msg.put("MessageType", "fiscal-error");
-        msg.put("service", "fiscal-service");
-        msg.put("severity", severidade);
-        msg.put("message", mensagem);
-        msg.put("timestamp", clock.instant().toString());
-        try {
-            publisher.publicarTopico(props.getTopicoSistema(), "fiscal-error", msg, Map.of("severity", severidade));
-        } catch (Exception e) {
-            log.error("falha ao publicar aviso de sistema", e);
         }
     }
 

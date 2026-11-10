@@ -28,6 +28,13 @@ public class InternoController {
         return ResponseEntity.noContent().build();
     }
 
+    /** EPB-10: o fiscal-service avisa que a nota da venda foi cancelada na SEFAZ. */
+    @PutMapping("/{id}/cancelamento")
+    public ResponseEntity<Void> canceladaPelaNota(@PathVariable long id, @Valid @RequestBody NotaFiscalInput in) {
+        service.canceladaPelaNota(id, in.notaFiscalId());
+        return ResponseEntity.noContent().build();
+    }
+
     public record NotaFiscalInput(@NotNull(message = "Informe a nota fiscal") Long notaFiscalId) {
     }
 }

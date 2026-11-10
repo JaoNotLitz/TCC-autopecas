@@ -357,6 +357,25 @@ class VendaIT {
     }
 
     @Test
+    void notaCanceladaCancelaAVenda() {
+        long orc = criar(venda("orcamento", 31L, List.of(item(7, 1, 89.9)))).get("id").asLong();
+        long fin = criar(venda("finalizada", 31L, List.of(item(8, 1, 10)))).get("id").asLong();
+        String url = "/internal/vendas/" + fin + "/cancelamento";
+
+        assertThat(chamar(HttpMethod.PUT, url, Map.of("notaFiscalId", 78)).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        var d = chamar(HttpMethod.GET, "/api/vendas/" + fin, null).getBody();
+        assertThat(d.get("status").asText()).isEqualTo("cancelada");
+        assertThat(d.get("notaFiscalId").asLong()).isEqualTo(78);
+        // repetido (retentativa do fiscal-service) não dá erro
+        assertThat(chamar(HttpMethod.PUT, url, Map.of("notaFiscalId", 78)).getStatusCode())
+                .isEqualTo(HttpStatus.NO_CONTENT);
+        // orçamento não tem nota: cancela pela tela, não por aqui
+        assertThat(chamar(HttpMethod.PUT, "/internal/vendas/" + orc + "/cancelamento", Map.of("notaFiscalId", 1))
+                .getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
+    @Test
     void semTokenResponde401() {
         var r = http.postForEntity("/api/vendas", venda("orcamento", null, List.of(item(7, 1, 1))), JsonNode.class);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);

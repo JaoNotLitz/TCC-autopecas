@@ -6,12 +6,13 @@ import org.springframework.stereotype.Component;
 
 /**
  * Saldo por produto da nota original (fica na primeira linha de cada produto). A devolução criada
- * soma "em devolução"; autorizada, passa para "devolvida"; rejeitada, só libera; reenviada, reserva de novo.
+ * soma "em devolução"; autorizada, passa para "devolvida"; rejeitada, só libera; reenviada, reserva de novo;
+ * cancelada depois de autorizada, sai de "devolvida".
  */
 @Component
 public class SaldoDevolucao {
 
-    public enum Evento { REENVIADA, AUTORIZADA, REJEITADA }
+    public enum Evento { REENVIADA, AUTORIZADA, REJEITADA, CANCELADA }
 
     private final NotaRepository repo;
 
@@ -40,6 +41,7 @@ public class SaldoDevolucao {
                     l.setQuantidadeEmDevolucao(Math.max(0, emDevolucao - q));
                     l.setQuantidadeDevolvida(nz(l.getQuantidadeDevolvida()) + q);
                 }
+                case CANCELADA -> l.setQuantidadeDevolvida(Math.max(0, nz(l.getQuantidadeDevolvida()) - q));
             }
             repo.salvarLinha(l);
         });

@@ -61,6 +61,13 @@ public class IntegracoesHttp implements Integracoes {
                         .body(Map.of("notaFiscalId", notaFiscalId)).retrieve().toBodilessEntity());
     }
 
+    @Override
+    public void cancelarVenda(long vendaId, long notaFiscalId) {
+        chamar("Serviço de vendas indisponível", "Venda " + vendaId + " não encontrada",
+                () -> vendas.put().uri("/internal/vendas/{id}/cancelamento", vendaId)
+                        .body(Map.of("notaFiscalId", notaFiscalId)).retrieve().toBodilessEntity());
+    }
+
     private <T> T chamar(String indisponivel, String naoEncontrado, Supplier<T> chamada) {
         RuntimeException ultima = null;
         for (int tentativa = 1; tentativa <= TENTATIVAS; tentativa++) {

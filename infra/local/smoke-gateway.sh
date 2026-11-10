@@ -61,5 +61,16 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 confere "SEFAZ simulada autoriza a nota" "$(grep -o '"status":"autorizada"' <<<"$nota")" '"status":"autorizada"'
+# Cancelamento pela nota: evento 110111 na SEFAZ simulada, nota e venda canceladas (EPB-10).
+nid=$(sed -nE 's/^\[\{"id":([0-9]+),.*/\1/p' <<<"$nota")
+confere "POST /notas/{id}/cancelamento" "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$G/notas/$nid/cancelamento" \
+  -H "$auth" -H 'Content-Type: application/json' -d '{"justificativa":"Cliente desistiu da compra no balcao"}')" 200
+for _ in $(seq 1 30); do
+  nota=$(curl -s "$G/notas/$nid" -H "$auth")
+  grep -q '"status":"cancelada"' <<<"$nota" && break
+  sleep 1
+done
+confere "SEFAZ simulada homologa o cancelamento" "$(grep -o '"status":"cancelada"' <<<"$nota")" '"status":"cancelada"'
+confere "venda fica cancelada" "$(curl -s "$G/vendas/$vid" -H "$auth" | grep -o '"status":"cancelada"')" '"status":"cancelada"'
 
 [ $falhas -eq 0 ] && echo "gateway ok" || { echo "$falhas falha(s)"; exit 1; }

@@ -20,8 +20,12 @@ provocar cada caso pela tela de vendas, sem mexer no código.
 | NFeAutorizacao4 | total terminando em **,13** | lote 103 com recibo; a consulta do recibo autoriza |
 | NFeAutorizacao4 | qualquer outro | lote 104 + protNFe 100 com protocolo (nota autorizada) |
 | NFeRetAutorizacao4 | qualquer | protNFe 100 |
-| NFeRecepcaoEvento4 | sem `<Signature>` / com | 297 / 128 + 135 (evento registrado) |
-| NFeInutilizacao4 | sem `<Signature>` / com | 297 / 102 (inutilização homologada) |
+| NFeRecepcaoEvento4 | sem `<Signature>` | 297 |
+| NFeRecepcaoEvento4 | justificativa com **"rejeitar"** | 218, "NF-e já está cancelada" (nota volta para autorizada) |
+| NFeRecepcaoEvento4 | qualquer outro | 128 + 135 (cancelamento homologado) |
+| NFeInutilizacao4 | sem `<Signature>` | 297 |
+| NFeInutilizacao4 | justificativa com **"rejeitar"** | 256, "parte da faixa já está utilizada" |
+| NFeInutilizacao4 | qualquer outro | 102 (inutilização homologada) |
 | NFeStatusServico4 | qualquer | 107 (serviço em operação) |
 
 A chave de acesso (`chNFe`) da resposta é copiada do `Id="NFe..."` do XML enviado.
