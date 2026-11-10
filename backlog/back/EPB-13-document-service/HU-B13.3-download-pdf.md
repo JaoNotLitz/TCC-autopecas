@@ -8,7 +8,7 @@ Como **vendedor**, quero **baixar ou imprimir o DANFE** para **entregar ao clien
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/documentos/pdf/{notaId}` responde `application/pdf` com `filename="DANFE_{numero}.pdf"`; `?inline=true` usa `Content-Disposition: inline` (impressão no navegador).
+- RF01 — `GET /api/notas/{id}/pdf` (caminho do `notasService.baixarPdf` do front; também usado pelo "Imprimir Cupom" do PDV) responde os bytes em `application/pdf` com `filename="DANFE_{numero}.pdf"`; `?inline=true` usa `Content-Disposition: inline` (impressão no navegador).
 - RF02 — PDF inexistente e nota autorizada → gera na hora (mesmo gerador da HU-B13.1), salva e devolve.
 - RF03 — Nota cancelada → devolve o PDF com carimbo "CANCELADA" sobreposto (gerado em memória, sem gravar).
 - RF04 — Nota não autorizada nem cancelada → `422`.
@@ -18,11 +18,11 @@ Como **vendedor**, quero **baixar ou imprimir o DANFE** para **entregar ao clien
 ```gherkin
 Cenário: PDF sob demanda
   Dado uma nota autorizada sem pdfPath
-  Quando chamo GET /api/documentos/pdf/{id}
+  Quando chamo GET /api/notas/{id}/pdf
   Então recebo o PDF e a nota passa a ter pdfPath
 
 Cenário: nota rejeitada
-  Então GET /api/documentos/pdf/{id} responde 422
+  Então GET /api/notas/{id}/pdf responde 422
 ```
 
 ## Subtasks

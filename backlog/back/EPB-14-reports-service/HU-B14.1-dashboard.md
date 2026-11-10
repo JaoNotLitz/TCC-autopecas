@@ -8,8 +8,8 @@ Como **dona da loja**, quero **ver na tela inicial vendas do dia e do mês, esto
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/dashboard` no formato da seção 5.8: `vendas {hoje, valorHoje, mes, valorMes, ticketMedio}`, `estoque {totalProdutos, produtosBaixo, produtosCriticos, valorTotalEstoque}`, `fiscal {emitidasHoje, autorizadas, processando, rejeitadas, valorHoje}`, `clientes {total, ativos, novosNoMes}`.
-- RF02 — Inclui `estoque.criticos[]` com até 5 produtos `{id, codigo, nome, ncm, estoqueAtual, estoqueMinimo}` (melhoria da seção 7.2.2 do mapeamento).
+- RF01 — Extra (o front atual deriva os números das listas e de `/api/produtos/resumo`): `GET /api/dashboard` com `vendas {hoje, valorHoje, mes, valorMes, ticketMedio}`, `estoque {totalProdutos, estoqueBaixo, itensCriticos, valorEmEstoque}` (mesmos nomes do `ResumoEstoque` do front), `fiscal {emitidasHoje, autorizadas, processando, rejeitadas, valorHoje}`, `clientes {total, ativos, novosNoMes}`.
+- RF02 — Inclui `estoque.criticos[]` com até 5 produtos `{id, codigo, nome, ncm, estoqueAtual, estoqueMinimo}` .
 - RF03 — Só vendas `finalizada` entram em vendas; `ticketMedio = valorMes / mes` (0 se não houver vendas).
 - RF04 — Cache Redis `dashboard:stats` 5 min; `?atualizar=true` força recálculo (ADMIN).
 - RF05 — "Hoje" e "mês" no fuso `America/Sao_Paulo`.

@@ -1,4 +1,6 @@
-# HU-B11.3 — Importar XML para processamento assíncrono
+# HU-B11.3 — Importar XML para processamento assíncrono (extensão)
+
+> **Extensão.** O front atual usa só a prévia síncrona (HU-B11.2) seguida do registro (HU-B11.1). Esta importação em lote fica para depois.
 
 **Épico:** [EPB-11](README.md) · **Unidade:** `entry-service` · **Estimativa:** 3 pts · **Depende de:** HU-B11.2
 
@@ -8,7 +10,7 @@ Como **estoquista com muitas notas**, quero **enviar XMLs para registro direto**
 
 ## Requisitos funcionais
 
-- RF01 — `POST /api/entrada/importar-xml` (`multipart`) valida formato e tamanho, lê o CNPJ do emitente e a data, e salva em `wc-xml-storage` na chave `fornecedor/{cnpj}/{ano}/{mes}/{chave}.xml`.
+- RF01 — `POST /api/notas/entrada/importar-xml/lote` (`multipart`, campo `arquivo`) valida formato e tamanho, lê o CNPJ do emitente e a data, e salva em `wc-xml-storage` na chave `fornecedor/{cnpj}/{ano}/{mes}/{chave}.xml`.
 - RF02 — Cria `entry_notes` com `status = recebida` e `origem = xml`, e publica `{eventType: "entry.uploaded", entryId, s3Key, timestamp}` na `entry-events-queue`.
 - RF03 — Responde `202` com `{uploadId (= entryId), s3Key, message}`.
 

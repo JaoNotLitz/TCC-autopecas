@@ -9,10 +9,10 @@ Como **vendedor**, quero **que a nota da venda seja criada automaticamente** par
 ## Requisitos funcionais
 
 - RF01 — Listener na `sales-events-queue` (5 concorrentes) processa `sale.created`.
-- RF02 — Busca a venda e os itens (`GET http://sales-service:8083/api/vendas/{id}`), o cliente quando houver (`customer-service`) e os dados fiscais de cada produto (`product-service`: `ncm`, `cfop`, `cest`, `origem`, `cstIcms`, `aliquotaIcms`).
+- RF02 — Busca a venda e os itens (`GET http://sales-service:8083/api/vendas/{id}`), o cliente quando houver (`customer-service`) e os dados fiscais de cada produto (`GET http://product-service:8082/internal/produtos/{id}`: `codigo`, `nome`, `ncm`, `cfop`, `origem`, `cstIcms`, `aliquotaIcms`).
 - RF03 — Gera o número com contador atômico por modelo e série (`counters`: `NFE-55-1`, `NFCE-65-1`).
-- RF04 — Grava `notas_fiscais` com `status = processando`, `tipo` (`NFE`/`NFCE`), `modelo` (`55`/`65`), `serie`, `numero` com 6 dígitos, `vendaId`, `clienteId`, `clienteNome` (ou "Consumidor Final"), `valorProdutos`, `valorDesconto`, `valorTotal`, `emitidaEm`, `ambiente`, `tentativasEnvio = 0`.
-- RF05 — Grava `notas_items` (cópia dos itens com dados fiscais, `itemId` próprio da nota e `quantidadeDevolvida = 0`).
+- RF04 — Grava `notas_fiscais` com `id` numérico (`IdGenerator`, recurso `notas`), `status = processando`, `tipo` (`NFE`/`NFCE`), `modelo` (`55`/`65`), `serie`, `numero` com 6 dígitos, `chaveAcesso = null` (preenchida no EPB-08), `vendaId`, `clienteId`, `clienteNome` e `clienteDocumento` copiados do cliente (`null` na NFC-e sem cliente), `fornecedorId = null`, `notaReferenciadaId = null`, `valorProdutos`, `valorDesconto`, `valorTotal`, `emitidaEm`, `ambiente`, `tentativasEnvio = 0`.
+- RF05 — Grava `notas_items` (cópia dos itens com `produtoId`, `codigo`, `descricao`, `ncm`, `cfop`, `quantidade`, `valorUnitario`; internamente uma SK sequencial e `quantidadeDevolvida = 0`).
 - RF06 — Chama o endpoint interno do sales-service para vincular `notaFiscalId` (HU-B06.7).
 - RF07 — Publica `{jobType: "generate_xml", notaId, tipoNota, timestamp}` na `fiscal-jobs-queue`.
 

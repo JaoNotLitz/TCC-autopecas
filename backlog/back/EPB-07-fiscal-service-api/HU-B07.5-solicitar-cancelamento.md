@@ -11,7 +11,7 @@ Como **administradora**, quero **cancelar uma nota autorizada dentro do prazo** 
 - RF01 — `POST /api/notas/{id}/cancelamento` (ADMIN) com `{justificativa}`.
 - RF02 — Cria `fiscal_events` (`tipo = CANCELAMENTO`, `status = processando`, `notaId`, `justificativa`, `usuarioId`, `registradoEm`).
 - RF03 — Publica na `fiscal-events-queue` `{eventType: "cancelamento", eventoId, notaId, chaveAcesso, justificativa, timestamp}`.
-- RF04 — Responde `200` com `{eventoId, status: "processando", message}`.
+- RF04 — Responde `200` com a `NotaFiscal` (formato do front) com `status: "processando"`; o status volta para `autorizada` se a SEFAZ recusar o evento, ou vira `cancelada` quando ela homologa (HU-B10.1).
 
 ## Regras e requisitos não funcionais
 
@@ -25,7 +25,7 @@ Como **administradora**, quero **cancelar uma nota autorizada dentro do prazo** 
 Cenário: cancelamento no prazo
   Dado uma nota autorizada há 2 horas
   Quando um ADMIN solicita cancelamento com justificativa válida
-  Então recebo 200 com status "processando" e o evento é publicado
+  Então recebo 200 com a nota em status "processando" e o evento é publicado
 
 Cenário: fora do prazo
   Dado uma nota autorizada há 25 horas

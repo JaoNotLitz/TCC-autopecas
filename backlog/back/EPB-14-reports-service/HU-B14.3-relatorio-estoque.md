@@ -8,8 +8,8 @@ Como **gerente**, quero **exportar a posição atual do estoque** para **planeja
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/relatorios/estoque?formato=csv|xlsx&status&categoria`.
-- RF02 — Colunas: `Codigo, Nome, NCM, Categoria, Estoque_Atual, Reservado, Disponivel, Estoque_Minimo, Status, Preco_Custo, Preco_Venda, Valor_Estoque`.
+- RF01 — `GET /api/relatorios/estoque?formato=csv|xlsx&status`.
+- RF02 — Colunas: `Codigo, Nome, NCM, Estoque_Atual, Reservado, Disponivel, Estoque_Minimo, Status, Preco_Custo, Preco_Venda, Valor_Estoque`.
 
 ## Critérios de aceite
 

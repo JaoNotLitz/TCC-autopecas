@@ -9,7 +9,7 @@ Como **vendedor**, quero **ver quantas compras e quanto um cliente já gastou** 
 ## Requisitos funcionais
 
 - RF01 — Listener na `customer-sales-events-queue` (assinante do `sales-events-topic`, decisão A2) processa `sale.created` com `clienteId` não nulo.
-- RF02 — Incrementa `totalCompras` em 1, soma `valorTotal` em `valorTotalCompras` e define `ultimaCompra = timestamp` com `UpdateItem` atômico (`ADD`).
+- RF02 — Incrementa `totalCompras` em 1 (quantidade de compras, como a tela mostra), soma `valorTotal` em `valorTotalCompras` (interno) e define `ultimaCompra = timestamp` (ISO) com `UpdateItem` atômico (`ADD`).
 - RF03 — Venda cancelada (`sale.cancelled`, se publicada) não altera estatísticas (fora do escopo; documentado).
 
 ## Regras e requisitos não funcionais

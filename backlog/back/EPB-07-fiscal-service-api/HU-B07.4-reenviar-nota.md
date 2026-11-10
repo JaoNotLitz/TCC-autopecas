@@ -8,8 +8,8 @@ Como **responsável fiscal**, quero **reenviar uma nota rejeitada depois de corr
 
 ## Requisitos funcionais
 
-- RF01 — `POST /api/notas/{id}/reenviar` só para `status = rejeitada`; senão `422`.
-- RF02 — Zera `tentativasEnvio`, volta `status` para `processando` e publica **novo job `generate_xml`** (o XML é regerado para refletir dados corrigidos, como endereço do cliente), que segue para a `sefaz-queue`.
+- RF01 — `POST /api/notas/{id}/reenviar` só para `status = rejeitada`; senão `422`. Responde a `NotaFiscal` com `status: "processando"`. Extra: o front ainda não tem o status `rejeitada` nem o botão (seção 5.10 da arquitetura).
+- RF02 — Zera `tentativasEnvio`, volta `status` para `processando` e publica **novo job `generate_xml`** (o XML é regerado para refletir dados corrigidos do cliente ou do produto), que segue para a `sefaz-queue`.
 - RF03 — Responde `200` com `{message: "Nota reenviada para processamento", notaId}`.
 
 ## Regras e requisitos não funcionais

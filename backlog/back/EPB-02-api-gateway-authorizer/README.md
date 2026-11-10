@@ -9,12 +9,13 @@ Dar ao front um **único endereço** (`http://localhost:4566/restapis/{id}/local
 
 ## Decisão local (A1)
 
-O ALB e o API Gateway HTTP API (v2) são recursos pagos do LocalStack. Localmente o gateway é **REST (v1)** com integração `HTTP_PROXY` direto para `http://{servico}:{porta}` na rede do Compose. O roteamento por prefixo é o mesmo da seção 3.2.
+O ALB e o API Gateway HTTP API (v2) são recursos pagos do LocalStack. Localmente o gateway é **REST (v1)** com integração `HTTP_PROXY` direto para `http://{servico}:{porta}` na rede do Compose. O roteamento é o mesmo da seção 3.2 (caminhos especiais de `/api/notas` antes da regra geral).
 
 ## Critérios de aceite do épico
 
 - O front fala só com o gateway; nenhum serviço é chamado direto pela porta.
-- Rotas públicas: `POST /api/auth/login` e `POST /api/auth/refresh`. Todo o resto exige token válido.
+- Rota pública: `POST /api/auth/login`. Todo o resto exige token válido.
+- Os caminhos são os que o front React chama (`VITE_API_URL` = URL do gateway terminada em `/api`).
 - A API é recriada automaticamente no init do LocalStack.
 
 ## Histórias

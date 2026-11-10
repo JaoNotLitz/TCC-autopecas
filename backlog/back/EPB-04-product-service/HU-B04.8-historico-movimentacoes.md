@@ -8,7 +8,7 @@ Como **gerente**, quero **ver todas as entradas, saídas, reservas e ajustes de 
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/produtos/{id}/movimentos` com `de`, `ate`, `tipo` (`entrada|saida|ajuste|reserva|liberacao`), `limit` (default 50), `lastKey`; envelope padrão.
+- RF01 — `GET /api/produtos/{id}/movimentos` com `de`, `ate`, `tipo` (`entrada|saida|ajuste|reserva|liberacao`); responde array puro, mais recente primeiro. Extra: o front atual ainda não tem essa tela.
 - RF02 — Query no `produto-data-index` (PK `produtoId`, SK `data`), ordem decrescente de data.
 - RF03 — Cada item: `id, produtoId, tipo, quantidade (com sinal), estoqueAnterior, estoqueNovo, referenciaId, referenciaType, usuarioId, motivo, data`.
 
@@ -22,7 +22,7 @@ Cenário: histórico do produto
 
 Cenário: filtro por tipo e período
   Quando filtro tipo=ajuste e um período sem ajustes
-  Então recebo items vazio
+  Então recebo um array vazio
 ```
 
 ## Subtasks

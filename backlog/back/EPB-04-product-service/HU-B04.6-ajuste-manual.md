@@ -1,5 +1,7 @@
 # HU-B04.6 — Ajuste manual de estoque
 
+> **Extra.** A tela de Estoque do front altera a quantidade pelo `PUT /api/produtos/{id}` (HU-B04.4). Este endpoint com motivo explícito fica disponível para quando a tela ganhar um campo de motivo.
+
 **Épico:** [EPB-04](README.md) · **Unidade:** `product-service` · **Estimativa:** 3 pts · **Depende de:** HU-B04.1, HU-B05.3
 
 ## História

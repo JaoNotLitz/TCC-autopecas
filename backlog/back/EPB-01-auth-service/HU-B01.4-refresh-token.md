@@ -1,5 +1,7 @@
 # HU-B01.4 — Renovar token (refresh)
 
+> **Fora do escopo (2026-11-10).** O back segue o contrato do front, que não tem refresh token: o login devolve só `{ token, usuario }` e, quando o token expira, a resposta `401` leva o usuário de volta ao login. Esta história fica registrada caso o front passe a renovar o token.
+
 **Épico:** [EPB-01](README.md) · **Unidade:** `auth-service` · **Estimativa:** 3 pts · **Depende de:** HU-B01.1
 
 ## História

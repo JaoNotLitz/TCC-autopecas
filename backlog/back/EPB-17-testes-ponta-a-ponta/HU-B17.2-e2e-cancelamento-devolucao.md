@@ -9,7 +9,7 @@ Como **banca do TCC**, quero **ver cancelamento e devolução ajustando nota e e
 ## Requisitos funcionais
 
 - RF01 — Cancelamento: a partir de uma NFC-e autorizada, pede cancelamento, aguarda `cancelada` e confere estoque devolvido e evento concluído.
-- RF02 — Devolução: a partir de uma NF-e autorizada de 3 unidades, devolve 1, aguarda a devolução `autorizada`, confere `quantidadeDevolvida = 1` e estoque +1; tenta devolver 3 e recebe `422`.
+- RF02 — Devolução: a partir de uma NF-e autorizada de 3 unidades, devolve 1, aguarda a devolução `autorizada`, confere o saldo devolvível do produto (2) e estoque +1; tenta devolver 3 e recebe `422`. O pedido usa o `DevolucaoInput` do front (`produtoId`, `quantidade`, `valorUnitario`).
 - RF03 — Inutilização: inutiliza uma faixa acima do último número e confere evento concluído.
 
 ## Critérios de aceite

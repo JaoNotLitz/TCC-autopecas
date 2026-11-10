@@ -8,7 +8,7 @@ Como **front-end**, quero **validar o token salvo ao abrir a página** para **sa
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/auth/me` com `Authorization: Bearer {token}` responde `200` com `{id, nome, email, papel}`.
+- RF01 — `GET /api/auth/me` com `Authorization: Bearer {token}` responde `200` com o `Usuario` do front: `{id, nome, email}` (+ `papel` extra). O front chama ao recarregar a página para validar o token salvo no `sessionStorage`.
 - RF02 — Valida assinatura e expiração do token, existência da sessão no Redis e `ativo = true` do usuário.
 - RF03 — Qualquer falha responde `401` no formato padrão.
 
@@ -29,15 +29,11 @@ Cenário: usuário desativado depois do login
   Dado um token válido de um usuário que foi desativado
   Então GET /api/auth/me responde 401
 
-Cenário: refresh token usado como access
-  Quando chamo GET /api/auth/me com um refreshToken
-  Então recebo 401
 ```
 
 ## Subtasks
 
 - [ ] ST-B01.3.1 Endpoint `/me`
-- [ ] ST-B01.3.2 Rejeitar `typ = refresh` em rotas protegidas
 
 ## Testes
 
@@ -46,4 +42,3 @@ Cenário: refresh token usado como access
 | TC-B01.3.1 | API | token válido → 200 | token válido |
 | TC-B01.3.2 | Integração (Redis) | apaga sessão → 401 | sessão expirada |
 | TC-B01.3.3 | Integração | desativa usuário → 401 | desativado |
-| TC-B01.3.4 | Unitário | `typ=refresh` → 401 | refresh como access |

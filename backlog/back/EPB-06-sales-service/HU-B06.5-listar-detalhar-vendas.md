@@ -1,4 +1,6 @@
-# HU-B06.5 — Listar e detalhar vendas
+# HU-B06.5 — Listar e detalhar vendas (extra)
+
+> **Extra.** O front atual só cria vendas (`POST /api/vendas`). Estes endpoints ficam para a retomada de orçamentos e para o e2e.
 
 **Épico:** [EPB-06](README.md) · **Unidade:** `sales-service` · **Estimativa:** 3 pts · **Depende de:** HU-B06.1
 
@@ -8,9 +10,9 @@ Como **vendedor**, quero **consultar vendas e orçamentos** para **retomar um or
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/vendas` com `status`, `clienteId`, `vendedorId`, `de`, `ate`, `limit`, `lastKey`; envelope padrão com vendas resumidas (sem itens).
+- RF01 — `GET /api/vendas` com `status`, `clienteId`, `de`, `ate`; responde `Venda[]` (array puro, mais recente primeiro).
 - RF02 — `status` → `status-index`; `clienteId` → `cliente-index`; período → `data-index` (PK `dataDia`, SK `criadaEm`).
-- RF03 — `GET /api/vendas/{id}` no formato da seção 5.4: inclui `cliente {id, nome}`, `notaFiscalId`, `itens[]` com `itemId`, `codigo`, `nome`, `valorTotal`.
+- RF03 — `GET /api/vendas/{id}` responde a `Venda` do front + `notaFiscalId` (extra, `null` enquanto a nota não foi criada).
 - RF04 — Inexistente → `404`.
 
 ## Critérios de aceite
@@ -19,11 +21,11 @@ Como **vendedor**, quero **consultar vendas e orçamentos** para **retomar um or
 Cenário: listar orçamentos
   Dado 3 orçamentos e 5 vendas finalizadas
   Quando chamo GET /api/vendas?status=orcamento
-  Então recebo 3 itens
+  Então recebo um array com 3 vendas
 
 Cenário: detalhe com itens
   Quando chamo GET /api/vendas/{id}
-  Então recebo os itens com itemId e valorTotal
+  Então recebo a venda com itens {produtoId, quantidade, valorUnitario} e notaFiscalId
 ```
 
 ## Subtasks

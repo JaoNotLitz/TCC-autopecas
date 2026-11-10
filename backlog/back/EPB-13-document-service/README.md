@@ -14,7 +14,7 @@ S3 `wc-documents-bucket` (leitura/escrita), `wc-reports-bucket` (lotes) · Dynam
 ## Critérios de aceite do épico
 
 - Toda nota autorizada tem PDF em até 30 s.
-- Downloads funcionam no navegador pelo gateway (ou por URL pré-assinada do LocalStack).
+- Downloads funcionam pelo gateway nos caminhos que o front chama (`/api/notas/{id}/xml`, `/api/notas/{id}/pdf`, `POST /api/notas/lote-contador`), devolvendo os bytes do arquivo: o front baixa com `fetch` + `Authorization`, então nada de redirect para o S3.
 
 ## Histórias
 

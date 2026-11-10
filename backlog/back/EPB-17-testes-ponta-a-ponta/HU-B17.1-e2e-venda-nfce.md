@@ -9,9 +9,9 @@ Como **banca do TCC**, quero **ver uma venda virar nota autorizada com PDF e est
 ## Requisitos funcionais
 
 - RF01 — Teste faz login, consulta o estoque do PF-001, cria venda NFC-e finalizada de 2 unidades pelo gateway.
-- RF02 — Aguarda (Awaitility, até 60 s) a venda ter `notaFiscalId` e a nota ficar `autorizada`.
-- RF03 — Confere: `estoqueAtual` diminuiu 2 e `reservado` voltou ao valor anterior; XML baixa e é `nfeProc`; PDF baixa e contém a chave; dashboard (com `atualizar=true`) conta a venda.
-- RF04 — Repete para NF-e com cliente PJ completo, e confere o `422` com cliente sem endereço.
+- RF02 — Aguarda (Awaitility, até 60 s) `GET /api/notas?vendaId={id}` trazer a nota da venda com `status: "autorizada"` (mesmo caminho que o PDV do front usa).
+- RF03 — Confere: `estoqueAtual` diminuiu 2 e `reservado` voltou ao valor anterior; `GET /api/notas/{id}/xml` baixa um `nfeProc`; `GET /api/notas/{id}/pdf` baixa um PDF que contém a chave.
+- RF04 — Repete para NF-e com cliente PJ e confere o `400` de NF-e sem `clienteId`.
 
 ## Critérios de aceite
 
@@ -26,7 +26,7 @@ Cenário: fluxo feliz NFC-e
 
 - [ ] ST-B17.1.1 Base do módulo (Testcontainers `ComposeContainer`, cliente RestAssured autenticado)
 - [ ] ST-B17.1.2 Cenário NFC-e
-- [ ] ST-B17.1.3 Cenário NF-e e 422
+- [ ] ST-B17.1.3 Cenário NF-e e NF-e sem cliente
 
 ## Testes
 
@@ -34,4 +34,4 @@ Cenário: fluxo feliz NFC-e
 |---|---|---|---|
 | TC-B17.1.1 | E2E | NFC-e | fluxo feliz |
 | TC-B17.1.2 | E2E | NF-e PJ | RF04 |
-| TC-B17.1.3 | E2E | NF-e sem endereço → 422 | RF04 |
+| TC-B17.1.3 | E2E | NF-e sem cliente → 400 | RF04 |

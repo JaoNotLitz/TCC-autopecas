@@ -11,7 +11,7 @@ Permitir que qualquer pessoa clone o repositório e suba **todo** o back com um 
 
 - `docker-compose.yml` com LocalStack, Redis, `sefaz-mock` e um serviço por microsserviço.
 - Criação idempotente dos recursos AWS da arquitetura (11 tabelas, filas, tópicos, buckets, secrets).
-- Projeto Maven multi-módulo e a lib `wc-commons` (erro padrão, paginação, segurança, clientes AWS).
+- Projeto Maven multi-módulo e a lib `wc-commons` (erro padrão, ids numéricos, listagens, segurança, clientes AWS).
 - Dados de seed e certificado A1 de teste.
 - CI no GitHub Actions rodando os testes com Testcontainers.
 

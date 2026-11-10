@@ -8,9 +8,9 @@ Como **administradora**, quero **saber por que um cancelamento ou inutilização
 
 ## Requisitos funcionais
 
-- RF01 — Retorno diferente de 135/155/102: evento `status = rejeitado`, `codigoStatus`, `motivo`; a nota continua `autorizada`.
+- RF01 — Retorno diferente de 135/155/102: evento `status = rejeitado`, `codigoStatus`, `motivo`; a nota, que estava `processando` desde o pedido (HU-B07.5), volta para `autorizada`.
 - RF02 — Erros de comunicação seguem a mesma política da HU-B09.5 (3 tentativas, DLQ, alerta).
-- RF03 — `GET /api/notas/{id}` passa a incluir `eventos[]` (tipo, status, protocolo, motivo, registradoEm) para o front mostrar o resultado.
+- RF03 — Extra: `GET /internal/notas/{id}` inclui `eventos[]` (tipo, status, protocolo, motivo, registradoEm). O front atual vê o resultado pelo `status` da nota em `GET /api/notas`.
 
 ## Critérios de aceite
 
@@ -18,10 +18,11 @@ Como **administradora**, quero **saber por que um cancelamento ou inutilização
 Cenário: cancelamento rejeitado
   Dado o mock configurado para responder cStat 218 (NF-e já cancelada)
   Então o evento fica rejeitado com o motivo
-  E a nota continua autorizada
+  E a nota volta para autorizada
 
 Cenário: resultado visível
-  Então GET /api/notas/{id} mostra o evento rejeitado em eventos[]
+  Então GET /api/notas?status=autorizada volta a listar a nota
+  E GET /internal/notas/{id} mostra o evento rejeitado em eventos[]
 ```
 
 ## Subtasks

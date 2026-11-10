@@ -8,13 +8,13 @@ Como **gerente**, quero **ver totais do estoque no topo da tela** para **saber q
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/produtos/resumo` com `{totalProdutos, produtosBaixo, produtosCriticos, valorTotalEstoque, produtosAtivos, produtosInativos}`.
-- RF02 — `valorTotalEstoque = Σ estoqueAtual × precoCusto` dos ativos.
+- RF01 — `GET /api/produtos/resumo` responde o `ResumoEstoque` do front: `{totalProdutos, estoqueBaixo, valorEmEstoque, itensCriticos}`.
+- RF02 — `totalProdutos` = produtos ativos; `estoqueBaixo` = ativos com status `baixo` ou `critico`; `itensCriticos` = só `critico`; `valorEmEstoque = Σ estoqueAtual × precoCusto` dos ativos.
 - RF03 — Cache Redis de 5 min (`product:resumo`), invalidado em criação, desativação e quando o listener muda status.
 
 ## Regras e requisitos não funcionais
 
-- Contagens por status via `status-index` (`Select=COUNT`); valor total via scan paginado com projeção, só quando o cache expirou.
+- Contagens por status via `status-index` (`Select=COUNT`); valor total via scan com projeção, só quando o cache expirou.
 
 ## Critérios de aceite
 
@@ -22,7 +22,7 @@ Como **gerente**, quero **ver totais do estoque no topo da tela** para **saber q
 Cenário: resumo bate com os dados
   Dado o seed com 20 produtos
   Quando chamo GET /api/produtos/resumo
-  Então os números batem com uma contagem manual das tabelas
+  Então recebo exatamente os 4 campos e os números batem com uma contagem manual das tabelas
 
 Cenário: cache
   Quando chamo duas vezes em menos de 5 minutos
@@ -40,3 +40,4 @@ Cenário: cache
 |---|---|---|---|
 | TC-B04.7.1 | Integração | números com seed | bate |
 | TC-B04.7.2 | Integração | cache e invalidação ao criar produto | cache |
+| TC-B04.7.3 | Contrato | resposta valida contra `ResumoEstoque` do front | RF01 |

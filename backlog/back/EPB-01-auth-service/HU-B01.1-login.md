@@ -10,8 +10,8 @@ Como **usuário da loja**, quero **entrar com meu e-mail e senha** para **recebe
 
 - RF01 — `POST /api/auth/login` recebe `{email, senha}`.
 - RF02 — Busca o usuário pelo GSI `email-index` da tabela `users` e compara a senha com o hash BCrypt.
-- RF03 — Em caso de sucesso, gera `token` (access, expira em 8 h) e `refreshToken` (expira em 7 dias), assinados em HS512 com a chave de `wc-jwt-secret`. Claims: `sub` (usuarioId), `papel`, `jti`, `iat`, `exp`, `typ` (`access`/`refresh`).
-- RF04 — Responde `200` com `{token, refreshToken, usuario:{id, nome, email, papel}, expiresIn: 28800}`.
+- RF03 — Em caso de sucesso, gera `token` (expira em 8 h), assinado em HS512 com a chave de `wc-jwt-secret`. Claims: `sub` (usuarioId numérico), `papel`, `jti`, `iat`, `exp`. Não há refresh token: quando expira, o front recebe `401` e volta ao login.
+- RF04 — Responde `200` com `LoginResponse` do front: `{token, usuario:{id, nome, email, papel}}` (`id` numérico; `papel` é campo extra que o front ignora por enquanto).
 - RF05 — Cria a sessão no Redis (`session:{userId}:{sha256(token)}`, TTL 8 h) e atualiza `ultimoLogin` no usuário.
 
 ## Regras e requisitos não funcionais
@@ -28,7 +28,7 @@ Como **usuário da loja**, quero **entrar com meu e-mail e senha** para **recebe
 Cenário: login com sucesso
   Dado o usuário "admin@wcautopecas.com.br" ativo com a senha correta
   Quando faço POST /api/auth/login
-  Então recebo 200 com token, refreshToken, usuario.papel = "ADMIN" e expiresIn = 28800
+  Então recebo 200 com token e usuario {id numérico, nome, email, papel = "ADMIN"}
   E existe uma chave "session:{id}:*" no Redis com TTL de até 8 horas
 
 Cenário: senha errada

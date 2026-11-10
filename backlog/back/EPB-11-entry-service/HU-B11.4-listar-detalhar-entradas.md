@@ -1,4 +1,6 @@
-# HU-B11.4 — Listar e detalhar entradas
+# HU-B11.4 — Listar e detalhar entradas (extra)
+
+> **Extra.** A tela atual vê as entradas em `GET /api/notas` (tipo `ENTRADA`). Estes endpoints mostram o status interno da importação.
 
 **Épico:** [EPB-11](README.md) · **Unidade:** `entry-service` · **Estimativa:** 2 pts · **Depende de:** HU-B11.1
 
@@ -8,8 +10,8 @@ Como **estoquista**, quero **ver as entradas registradas e seu status** para **c
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/entrada` com `fornecedorCnpj`, `de`, `ate`, `status`, `limit`, `lastKey`; envelope padrão com resumo (`id, fornecedor.razaoSocial, fornecedor.cnpj, nota.numero, nota.dataEntrada, valorTotal, status, origem, quantidadeItens`).
-- RF02 — `GET /api/entrada/{id}` com todos os dados e itens (incluindo `produtoId` e `vinculado` por item, e `erro` quando `status = erro`).
+- RF01 — `GET /api/notas/entrada` com `fornecedorCnpj`, `de`, `ate`, `status`; array puro com resumo (`id, fornecedor.razaoSocial, fornecedor.cnpj, numero, dataEntrada, valorTotal, status, origem, quantidadeItens`).
+- RF02 — `GET /api/notas/entrada/{id}` com todos os dados e itens (incluindo `produtoId` e `vinculado` por item, e `erro` quando `status = erro`).
 - RF03 — Status possíveis: `recebida`, `registrada`, `com_pendencias`, `erro`.
 
 ## Critérios de aceite
@@ -18,7 +20,7 @@ Como **estoquista**, quero **ver as entradas registradas e seu status** para **c
 Cenário: listar por fornecedor
   Dado 3 entradas do fornecedor 12345678000195
   Quando filtro fornecedorCnpj=12345678000195
-  Então recebo as 3
+  Então recebo um array com as 3
 ```
 
 ## Subtasks

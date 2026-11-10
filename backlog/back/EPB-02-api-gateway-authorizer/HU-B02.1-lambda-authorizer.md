@@ -9,7 +9,7 @@ Como **arquiteta do sistema**, quero **barrar tokens inválidos no gateway** par
 ## Requisitos funcionais
 
 - RF01 — Lambda Java 21 (`RequestHandler<APIGatewayCustomAuthorizerEvent, IamPolicyResponse>`), tipo `REQUEST`, identity source `Authorization`.
-- RF02 — Valida assinatura HS512 com a chave de `wc-jwt-secret` (lida uma vez por container e mantida em cache) e a expiração. Rejeita `typ = refresh`.
+- RF02 — Valida assinatura HS512 com a chave de `wc-jwt-secret` (lida uma vez por container e mantida em cache) e a expiração.
 - RF03 — Token válido → policy `Allow` para `execute-api:Invoke` e `context` com `usuarioId` e `papel`.
 - RF04 — Token ausente, malformado, expirado ou com assinatura inválida → `Unauthorized` (o gateway responde `401`).
 - RF05 — Resposta do gateway para `401`/`403` customizada (Gateway Responses) no formato de erro da seção 5.0.
@@ -55,6 +55,6 @@ Cenário: token expirado
 | ID | Tipo | Cenário | Critério |
 |---|---|---|---|
 | TC-B02.1.1 | Unitário | handler com token válido → `Allow` + context | válido |
-| TC-B02.1.2 | Unitário | sem token, adulterado, expirado, refresh → `Unauthorized` | inválidos |
+| TC-B02.1.2 | Unitário | sem token, adulterado, expirado → `Unauthorized` | inválidos |
 | TC-B02.1.3 | Integração (LocalStack) | invoca a Lambda publicada com evento real | válido |
 | TC-B02.1.4 | API pelo gateway | sem token → 401 no formato padrão | sem token |

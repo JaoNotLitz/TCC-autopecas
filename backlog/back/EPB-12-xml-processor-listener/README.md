@@ -5,7 +5,7 @@
 
 ## Objetivo
 
-Processar XMLs enviados pela importação assíncrona: ler do S3, extrair os dados, registrar a entrada e somar ao estoque.
+Processar XMLs enviados pela importação assíncrona em lote (extensão, sem uso no front atual): ler do S3, extrair os dados, registrar a entrada e somar ao estoque.
 
 ## Dependências de infraestrutura
 

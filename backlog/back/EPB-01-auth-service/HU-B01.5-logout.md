@@ -8,7 +8,7 @@ Como **usuário**, quero **sair do sistema** para **que ninguém use minha sess�
 
 ## Requisitos funcionais
 
-- RF01 — `POST /api/auth/logout` com `Authorization: Bearer` responde `204`.
+- RF01 — `POST /api/auth/logout` com `Authorization: Bearer` responde `204`. Endpoint extra: o front atual só apaga o token do `sessionStorage`; o back fica pronto para quando ele passar a chamar.
 - RF02 — Remove a sessão do Redis e coloca o `jti` do access na blacklist até a expiração.
 
 ## Critérios de aceite

@@ -10,7 +10,7 @@ Como **administradora**, quero **que a faixa pedida seja inutilizada na SEFAZ** 
 
 - RF01 — Para `eventType = inutilizacao`, monta o `inutNFe` 4.00 (`ano` 2 dígitos, `CNPJ` do emitente, `mod`, `serie`, `nNFIni`, `nNFFin`, `xJust`), `Id = "ID{cUF}{ano}{CNPJ}{mod}{serie 3}{ini 9}{fin 9}"`.
 - RF02 — Assina `infInut` e envia para `NFeInutilizacao4`.
-- RF03 — `cStat 102`: evento `status = concluido` (`inutilizada`), `protocolo`, XML de retorno salvo em `INUTILIZACAO/{ano}/{mes}/{id}.xml`.
+- RF03 — `cStat 102`: evento `status = concluido` (`inutilizada`), `protocolo`, XML de retorno salvo em `INUTILIZACAO/{ano}/{mes}/{id}.xml`. O `protocolo` passa a aparecer em `GET /api/inutilizacoes` (tipo `Inutilizacao` do front).
 - RF04 — Avança o contador de numeração se a faixa inutilizada estiver acima do último número usado.
 
 ## Critérios de aceite

@@ -10,7 +10,7 @@ Como **desenvolvedora ou banca do TCC**, quero **dados de exemplo já carregados
 
 - RF01 — `make seed` carrega: usuário `admin@wcautopecas.com.br` (papel `ADMIN`, senha definida em `.env`, gravada com BCrypt), usuário `vendedor@wcautopecas.com.br` (papel `VENDEDOR`).
 - RF02 — 20 produtos de autopeças com NCM, CFOP e dados fiscais válidos, e registros em `inventory` cobrindo os quatro status (`ok`, `atencao`, `baixo`, `critico`).
-- RF03 — 10 clientes (PF e PJ, com CPF/CNPJ válidos), sendo pelo menos 2 sem endereço (para testar o `422` da NF-e).
+- RF03 — 10 clientes (PF e PJ, com CPF/CNPJ válidos), só com os campos do front (`tipo`, `documento`, `nome`, `email`, `telefone`, `cidade`, `uf`), ids numéricos.
 - RF04 — Certificado A1 **autoassinado de teste** (`.pfx` + senha) gerado por script com OpenSSL e gravado em `wc-sefaz-certificate` (Base64 + senha). Também gera uma versão **expirada** em `wc-sefaz-certificate-expirado` para testes de erro.
 - RF05 — Dados do emitente (CNPJ, IE, razão social, endereço, CRT) em `infra/local/seed/emitente.json`, carregados como configuração do fiscal-service.
 - RF06 — 3 XMLs de NF-e de fornecedor de exemplo em `infra/local/seed/xml/` (um válido, um com código de produto inexistente, um malformado).

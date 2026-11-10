@@ -1,17 +1,16 @@
-# HU-B03.3 — Detalhar cliente com cache
+# HU-B03.3 — Detalhar cliente com cache (extra)
 
-**Épico:** [EPB-03](README.md) · **Unidade:** `customer-service` · **Estimativa:** 2 pts · **Depende de:** HU-B03.1
+**Épico:** [EPB-03](README.md) · **Unidade:** `customer-service` · **Estimativa:** 1 pt · **Depende de:** HU-B03.1
 
 ## História
 
-Como **vendedor**, quero **ver todos os dados de um cliente** para **conferir endereço antes de emitir uma NF-e**.
+Como **sales-service**, quero **consultar um cliente pelo id** para **validar a venda com NF-e e copiar nome e documento para a nota**.
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/clientes/{id}` responde `200` com o formato completo da seção 5.2.
+- RF01 — `GET /api/clientes/{id}` responde `200` com o `Cliente` (mesmo formato da listagem). O front atual não chama este endpoint; ele serve às chamadas internas (decisão A4).
 - RF02 — Cache Redis `customer:{id}` com TTL 1 h, invalidado em PUT e DELETE.
 - RF03 — Id inexistente → `404`.
-- RF04 — Campo calculado `enderecoCompleto: boolean` (true se `cep`, `logradouro`, `numero`, `bairro`, `cidade`, `uf` preenchidos), usado pelo front para avisar antes de emitir NF-e.
 
 ## Critérios de aceite
 
@@ -22,14 +21,13 @@ Cenário: detalhe com cache
   Então a segunda resposta vem do Redis
 
 Cenário: inexistente
-  Quando chamo com um UUID que não existe
+  Quando chamo com um id que não existe
   Então recebo 404 no formato padrão
 ```
 
 ## Subtasks
 
 - [ ] ST-B03.3.1 Endpoint e cache
-- [ ] ST-B03.3.2 Campo `enderecoCompleto`
 
 ## Testes
 
@@ -37,4 +35,3 @@ Cenário: inexistente
 |---|---|---|---|
 | TC-B03.3.1 | Integração | segunda leitura não consulta o DynamoDB (spy) | cache |
 | TC-B03.3.2 | API | 404 | inexistente |
-| TC-B03.3.3 | Unitário | `enderecoCompleto` com e sem bairro | RF04 |

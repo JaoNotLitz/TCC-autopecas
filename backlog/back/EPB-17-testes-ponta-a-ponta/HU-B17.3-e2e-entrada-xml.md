@@ -8,9 +8,9 @@ Como **banca do TCC**, quero **ver o XML do fornecedor virar estoque** para **co
 
 ## Requisitos funcionais
 
-- RF01 — Prévia do XML válido, confirmação por `POST /api/entrada` e checagem do estoque.
-- RF02 — Importação assíncrona do XML com item desconhecido → entrada `com_pendencias` e estoque só dos itens vinculados.
-- RF03 — Importação do XML malformado → entrada `erro` e mensagem na DLQ.
+- RF01 — `POST /api/notas/entrada/importar-xml` (campo `arquivo`) com o XML válido, confirmação do `EntradaInput` devolvido por `POST /api/notas/entrada` e checagem do estoque e da nota `ENTRADA` em `GET /api/notas`.
+- RF02 — (Extensão) importação assíncrona do XML com item desconhecido → entrada `com_pendencias` e estoque só dos itens vinculados.
+- RF03 — (Extensão) importação assíncrona do XML malformado → entrada `erro` e mensagem na DLQ.
 
 ## Critérios de aceite
 

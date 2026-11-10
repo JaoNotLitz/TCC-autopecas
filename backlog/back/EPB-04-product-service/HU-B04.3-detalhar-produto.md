@@ -4,11 +4,11 @@
 
 ## História
 
-Como **sales-service e front**, quero **os dados completos de um produto com o estoque disponível** para **validar uma venda e montar o formulário de edição**.
+Como **sales-service**, quero **os dados completos de um produto com o estoque disponível** para **validar uma venda e montar o formulário de edição**.
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/produtos/{id}` no formato da seção 5.3, incluindo `estoque.ultimaMovimentacao` e os campos fiscais (`cfop`, `origem`, `cstIcms`, `aliquotaIcms`).
+- RF01 — `GET /api/produtos/{id}` responde o `Produto` do front (plano). Extra: o front atual não chama este endpoint. Os campos fiscais (`cfop`, `origem`, `cstIcms`, `aliquotaIcms`) e `reservado` só saem na rota interna `GET /internal/produtos/{id}`, usada pelo fiscal-service.
 - RF02 — Inexistente → `404`.
 - RF03 — Endpoint interno `POST /api/produtos/disponibilidade` (não exposto no gateway) recebe `[{produtoId, quantidade}]` e devolve, por item, `disponivel` e `suficiente` — usado pelo sales-service (decisão A4).
 
@@ -17,7 +17,7 @@ Como **sales-service e front**, quero **os dados completos de um produto com o e
 ```gherkin
 Cenário: detalhe
   Quando chamo GET /api/produtos/{id} de um produto existente
-  Então recebo 200 com os campos fiscais e o objeto estoque
+  Então recebo 200 com o produto no formato plano do front
 
 Cenário: disponibilidade
   Dado um produto com disponivel 3

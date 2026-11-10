@@ -9,7 +9,7 @@ Como **vendedor**, quero **saber antes de finalizar se falta alguma peça** para
 ## Requisitos funcionais
 
 - RF01 — Antes de gravar, chama `POST http://product-service:8082/api/produtos/disponibilidade` com todos os itens (somando quantidades do mesmo produto).
-- RF02 — Algum item insuficiente → `409` "Estoque insuficiente" com `campos[{campo: "itens[i].quantidade", message: "Disponível: N"}]` para cada um.
+- RF02 — Algum item insuficiente → `409` com message legível pela tela, citando o produto (ex.: "Estoque insuficiente para PF-001: disponível 1"); `campos[{campo: "itens[i].quantidade", message: "Disponível: N"}]` vai como extra.
 - RF03 — Vale para `finalizada` e `orcamento` (orçamento também reserva).
 
 ## Regras e requisitos não funcionais
@@ -22,7 +22,7 @@ Como **vendedor**, quero **saber antes de finalizar se falta alguma peça** para
 Cenário: falta de estoque
   Dado o produto PF-001 com disponivel 1
   Quando envio venda com 2 unidades
-  Então recebo 409 com campos itens[0].quantidade e message "Disponível: 1"
+  Então recebo 409 com message "Estoque insuficiente para PF-001: disponível 1"
 
 Cenário: mesmo produto em duas linhas
   Dado disponivel 3

@@ -5,7 +5,7 @@
 
 ## Objetivo
 
-Agregar números para o dashboard e gerar relatórios CSV/XLSX de vendas, estoque e notas.
+Gerar o relatório de notas do Painel Fiscal (`GET /api/notas/relatorio`, usado pelo front) e, como extras, o dashboard agregado e os relatórios de vendas e estoque.
 
 ## Dependências de infraestrutura
 
@@ -17,7 +17,7 @@ DynamoDB (leitura de `sales`, `inventory`, `products`, `notas_fiscais`, `custome
 
 | ID | Título | Pts |
 |---|---|---|
-| [HU-B14.1](HU-B14.1-dashboard.md) | Dashboard agregado | 5 |
-| [HU-B14.2](HU-B14.2-relatorio-vendas.md) | Relatório de vendas | 3 |
-| [HU-B14.3](HU-B14.3-relatorio-estoque.md) | Relatório de estoque | 2 |
-| [HU-B14.4](HU-B14.4-relatorio-fiscal.md) | Relatório fiscal | 2 |
+| [HU-B14.1](HU-B14.1-dashboard.md) | Dashboard agregado (extra) | 5 |
+| [HU-B14.2](HU-B14.2-relatorio-vendas.md) | Relatório de vendas (extra) | 3 |
+| [HU-B14.3](HU-B14.3-relatorio-estoque.md) | Relatório de estoque (extra) | 2 |
+| [HU-B14.4](HU-B14.4-relatorio-fiscal.md) | Relatório de notas (Painel Fiscal) | 2 |

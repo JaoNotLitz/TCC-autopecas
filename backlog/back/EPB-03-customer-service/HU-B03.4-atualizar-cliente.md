@@ -4,23 +4,28 @@
 
 ## História
 
-Como **vendedor**, quero **completar ou corrigir o cadastro de um cliente** para **poder emitir NF-e para ele**.
+Como **vendedor**, quero **corrigir o cadastro de um cliente ou reativá-lo** para **manter os dados certos nas notas**.
 
 ## Requisitos funcionais
 
-- RF01 — `PUT /api/clientes/{id}` com o mesmo corpo do POST; responde `200` com o cliente atualizado.
+- RF01 — `PUT /api/clientes/{id}` com o `ClienteInput` do front; responde `200` com o `Cliente` atualizado.
 - RF02 — Mesmas validações do POST; unicidade ignora o próprio cliente.
-- RF03 — Atualiza `dataAtualizacao`; não altera `totalCompras`, `valorTotalCompras`, `ultimaCompra`, `ativo` e `dataCriacao`.
+- RF03 — `ativo` vem do corpo: `true` reativa um cliente desativado. Não altera `totalCompras`, `ultimaCompra` nem `dataCriacao`.
 - RF04 — Troca de documento atualiza o item-guarda de unicidade na mesma transação.
 - RF05 — Invalida o cache do cliente e das buscas.
 
 ## Critérios de aceite
 
 ```gherkin
-Cenário: completar endereço
-  Dado um cliente sem endereço
-  Quando envio PUT com cep, logradouro, numero, bairro, cidade e uf
-  Então recebo 200 com enderecoCompleto true
+Cenário: corrigir telefone
+  Dado um cliente existente
+  Quando envio PUT com outro telefone
+  Então recebo 200 com o telefone novo e totalCompras inalterado
+
+Cenário: reativar
+  Dado um cliente desativado
+  Quando envio PUT com ativo true
+  Então ele volta a aparecer como ativo na listagem
 
 Cenário: documento em uso por outro
   Quando altero o documento para o de outro cliente
@@ -39,6 +44,6 @@ Cenário: cliente inexistente
 
 | ID | Tipo | Cenário | Critério |
 |---|---|---|---|
-| TC-B03.4.1 | Integração | completa endereço | completar |
+| TC-B03.4.1 | Integração | corrige telefone e reativa | corrigir / reativar |
 | TC-B03.4.2 | Integração | troca para documento existente → 409; mesmo documento → 200 | em uso |
-| TC-B03.4.3 | Unitário | campos protegidos não mudam | RF03 |
+| TC-B03.4.3 | Unitário | `totalCompras`, `ultimaCompra` e `dataCriacao` não mudam | RF03 |

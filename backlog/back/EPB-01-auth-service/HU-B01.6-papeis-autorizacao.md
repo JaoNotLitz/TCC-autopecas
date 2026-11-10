@@ -10,7 +10,8 @@ Como **dona da loja**, quero **que só administradores façam operações fiscai
 
 - RF01 — Enum `Papel` com `ADMIN` e `VENDEDOR` (o seed cria um de cada).
 - RF02 — Anotação `@RequerPapel(ADMIN)` no `wc-commons`, avaliada pelo filtro de segurança.
-- RF03 — Exigem `ADMIN`: `POST /api/notas/{id}/cancelamento`, `POST /api/notas/inutilizacao`, `POST /api/produtos/{id}/ajuste`, `DELETE /api/produtos/{id}`, `DELETE /api/clientes/{id}`.
+- RF03 — Exigem `ADMIN`: `POST /api/notas/{id}/cancelamento`, `POST /api/inutilizacoes`, `PUT /api/produtos/{id}` **quando muda `estoqueAtual`** (e `POST /api/produtos/{id}/ajuste`, extra), `DELETE /api/produtos/{id}`, `DELETE /api/clientes/{id}`.
+- RF05 — `papel` vai em `usuario` no login e no `/me` (campo extra no contrato do front, pronto para o guard H13 do front).
 - RF04 — Papel insuficiente responde `403` com message "Você não tem permissão para esta operação".
 
 ## Regras e requisitos não funcionais
@@ -22,7 +23,7 @@ Como **dona da loja**, quero **que só administradores façam operações fiscai
 ```gherkin
 Cenário: vendedor tenta inutilizar faixa
   Dado um token de usuário VENDEDOR
-  Quando faço POST /api/notas/inutilizacao
+  Quando faço POST /api/inutilizacoes
   Então recebo 403 no formato padrão
 
 Cenário: admin pode

@@ -6,6 +6,8 @@
 
 Fontes: [`ARQUITETURA-BACKEND-DETALHADA.md`](../ARQUITETURA-BACKEND-DETALHADA.md) e [`MAPEAMENTO-CLASSES.md`](../MAPEAMENTO-CLASSES.md). Quando o backlog e esses documentos divergirem, os documentos valem, exceto nos pontos listados em [Decisões e pontos em aberto](#decisões-e-pontos-em-aberto).
 
+> **O back segue o front (2026-11-10).** O front é React e fica em [`dinastiadoge/tcc`](https://github.com/dinastiadoge/tcc). O contrato da API (seção 5 da arquitetura) é o dos tipos e serviços desse front: ids numéricos, listagens em array sem paginação, caminhos como `/notas/{id}/xml` e `/inutilizacoes`, devolução por `produtoId`. As histórias de back já seguem esse contrato; endpoints que o front não usa estão marcados como **extra**.
+
 ## Princípio do back: um épico, uma unidade de microsserviço
 
 Cada épico de back entrega **uma unidade executável** (uma API Spring Boot, um listener SQS, uma Lambda ou a própria stack de infraestrutura). O épico só termina quando essa unidade sobe com `docker compose up`, fala com o LocalStack e passa nos testes da própria pasta. Tudo roda **100% local**: AWS emulada pelo LocalStack, demais dependências (Redis, simulador da SEFAZ) em containers Docker.
@@ -49,7 +51,9 @@ backlog/
 | [EPB-16](back/EPB-16-operacao-dlq/README.md) | Lambdas `wc-dlq-monitor` e `wc-dlq-redrive` + observabilidade | Lambda | 4 |
 | [EPB-17](back/EPB-17-testes-ponta-a-ponta/README.md) | Módulo `e2e-tests` (fluxos completos na stack local) | Testes | 4 |
 
-## Épicos de front (Angular 22)
+## Épicos de front (referência)
+
+> Estes épicos foram escritos supondo um front Angular e o contrato antigo do back (UUID, paginação). O front real é React, no repositório `dinastiadoge/tcc`, com backlog próprio em `docs/HISTORIAS.md` (H1 a H13); vale ele. Mudanças no front só por Pull Request naquele repositório.
 
 | Épico | Tela / área | Rota | Histórias |
 |---|---|---|---|
@@ -81,7 +85,7 @@ backlog/
 
 **Stack de testes.**
 - Back: JUnit 5 + Mockito (unitário), Testcontainers com o módulo LocalStack e Redis (integração), RestAssured (API), Spring Cloud Contract ou JSON Schema (contrato com o front).
-- Front: runner unitário do Angular CLI (Vitest) com `HttpTestingController`, Playwright para E2E contra a stack local.
+- Front (repositório do front): Vitest para unidade, Playwright para E2E contra a stack local.
 
 ## Definition of Ready (DoR)
 
@@ -94,8 +98,8 @@ backlog/
 - Código revisado em PR e mergeado na `main`.
 - Testes da seção *Testes* implementados e passando no CI.
 - Cobertura de linhas ≥ 80% nas classes de domínio e serviço (back) e nos serviços e componentes alterados (front).
-- Roda local com `docker compose up` (back) ou `ng serve` apontando para a stack local (front), sem nenhuma conta AWS real.
-- Formato de erro, paginação e nomes de campos conforme a seção 5.0 da arquitetura.
+- Roda local com `docker compose up` (back) ou `npm run dev` com `VITE_API_URL` apontando para o gateway local (front), sem nenhuma conta AWS real.
+- Formato de erro, ids numéricos, listagens em array e nomes de campos conforme a seção 5 da arquitetura (os tipos de `src/app/types/index.ts` do front). Teste de contrato contra esses tipos nas histórias de API.
 - Logs estruturados em JSON com `correlationId` (back).
 
 ## Ordem sugerida (sprints de 2 semanas)
@@ -136,10 +140,11 @@ Pontos em que a arquitetura não fecha ou não roda no LocalStack gratuito. Cada
 | A2 | `sales-events-queue` tem dois consumidores (Fiscal e Customer). Em SQS, cada mensagem vai para só um deles | Novo tópico SNS `sales-events-topic` com duas filas assinantes: `sales-events-queue` (fiscal) e `customer-sales-events-queue` (customer). O Sales Service publica no tópico | HU-B00.2, HU-B03.7, HU-B06.4, HU-B07.1 |
 | A3 | O aviso "nota autorizada" para o Document Service é descrito como "interno", sem fila | Nova fila `document-events-queue`; o PDF também é gerado sob demanda no download se ainda não existir | HU-B00.2, HU-B09.2, HU-B13.1 |
 | A4 | Sales precisa checar estoque e endereço do cliente de forma síncrona; a venda precisa saber qual nota foi gerada | Chamadas HTTP internas na rede do Compose, repassando o token: sales → `product-service` e `customer-service`; fiscal → `sales-service` (`PUT /internal/vendas/{id}/nota-fiscal`). Rotas `/internal` não passam pelo gateway | HU-B04.3, HU-B06.2, HU-B06.3, HU-B06.7, HU-B07.1 |
-| A5 | Item de entrada cujo `codigo` não existe no catálogo | Entrada manual: `422` listando os códigos desconhecidos. Importação assíncrona: entrada registrada com status `com_pendencias`, item sem `produtoId` e sem movimentar estoque | HU-B11.1, HU-B12.1 |
-| A6 | Botão "Adicionar item" na devolução não tem como gerar `itemId` | Botão removido; só itens da nota referenciada podem ser devolvidos | HU-F09.2 |
-| A7 | Histórico de inutilizações, CRUD de fornecedores e de usuários não têm endpoint | Fora do escopo do TCC; HU-F08.2 fica bloqueada até existir `GET /api/notas/inutilizacao` | HU-F08.2 |
+| A5 | Item de entrada cujo `codigo` não existe no catálogo | `POST /api/notas/entrada`: `422` listando os códigos desconhecidos (a prévia do XML devolve `produtoId: null` nesses itens). Importação assíncrona (extensão): entrada registrada com status `com_pendencias`, item sem `produtoId` e sem movimentar estoque | HU-B11.1, HU-B12.1 |
+| A6 | Botão "Adicionar item" na devolução | O back só aceita produtos da nota referenciada (`422` para outro `produtoId`); o botão não tem uso (resposta à Q4 do front) | HU-B07.7 |
+| A7 | CRUD de fornecedores e de usuários não têm endpoint | Fora do escopo do TCC. Fornecedores são gravados a partir das notas de entrada. O histórico de inutilizações agora existe (`GET /api/inutilizacoes`) | HU-B07.6, HU-B11.1 |
 | A8 | Ambiente SEFAZ | Local sempre aponta para o container `sefaz-mock` (WireMock), ambiente `homologacao`. URL real só por variável de ambiente | HU-B09.1, HU-B09.6 |
 | A9 | Linguagem da Lambda | Java 21 (mesma stack dos serviços), empacotada como zip e publicada no LocalStack pelo script de init | HU-B02.1, HU-B16.1 |
-| A10 | A arquitetura só cita `papel`, sem matriz de permissões | Papéis `ADMIN` e `VENDEDOR`. Só ADMIN cancela e inutiliza notas, ajusta estoque e desativa clientes e produtos | HU-B01.6, HU-F01.4 |
-| A11 | Campos e filtros que o front precisa e a arquitetura não tem | Acrescentados: `vendaId` e `clienteDocumento` em `GET /api/notas`, `eventos[]` no detalhe da nota, `enderecoCompleto` no cliente, `criticos[]` no dashboard, `cadastrado` nos itens da prévia de XML. `POST /api/produtos/{id}/ajuste` responde `202` porque o efeito é assíncrono | HU-B03.3, HU-B04.6, HU-B07.2, HU-B10.3, HU-B11.2, HU-B14.1 |
+| A10 | A arquitetura só cita `papel`, sem matriz de permissões | Papéis `ADMIN` e `VENDEDOR`, um por usuário. Só ADMIN cancela e inutiliza notas, altera quantidade em estoque e desativa clientes e produtos (respostas às Q6/Q7 do front) | HU-B01.6 |
+| A11 | Campos e filtros que o back acrescenta sem quebrar o front | Extras que o front ignora: `papel` no usuário, filtro `vendaId` (e `tipo`) em `GET /api/notas`, `notaFiscalId` em `GET /api/vendas/{id}`, `eventos[]` na rota interna da nota | HU-B01.6, HU-B06.5, HU-B07.2, HU-B10.3 |
+| A12 | O back segue o contrato do front (decisão de 2026-11-10) | Ids `number` (tabela `counters`), listagens em array sem paginação, sem refresh token, cliente sem endereço, produto plano com `estoqueAtual` editável no `PUT`, caminhos do front (`/notas/{id}/xml`, `/notas/lote-contador`, `/notas/relatorio`, `/notas/entrada`, `/inutilizacoes`), devolução por `produtoId`. Pendências que pedem PR no front: status `rejeitada` e endereço do destinatário (seção 5.10) | todas as histórias de API |

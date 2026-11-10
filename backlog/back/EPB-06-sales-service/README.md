@@ -15,16 +15,16 @@ DynamoDB `sales`, `sale_items`, `counters` · SQS `inventory-updates-queue` (pro
 
 - Uma venda NFC-e finalizada no PDV gera reserva de estoque e uma nota em `processando` no fiscal-service.
 - Orçamentos podem ser finalizados ou cancelados depois.
-- Erros `409` (estoque) e `422` (endereço para NF-e) chegam ao front com `campos` úteis.
+- `POST /api/vendas` responde o tipo `Venda` do front (id numérico). Erros `400` (desconto, NF-e sem cliente) e `409` (estoque) chegam com `message` legível, que é o que a tela mostra.
 
 ## Histórias
 
 | ID | Título | Pts |
 |---|---|---|
 | [HU-B06.1](HU-B06.1-criar-venda.md) | Criar venda ou orçamento | 5 |
-| [HU-B06.2](HU-B06.2-validar-cliente-nfe.md) | Validar cliente para NF-e | 3 |
+| [HU-B06.2](HU-B06.2-validar-cliente-nfe.md) | Validar cliente para NF-e | 2 |
 | [HU-B06.3](HU-B06.3-validar-estoque.md) | Validar estoque disponível | 3 |
 | [HU-B06.4](HU-B06.4-eventos-venda.md) | Reservar estoque e disparar emissão | 3 |
-| [HU-B06.5](HU-B06.5-listar-detalhar-vendas.md) | Listar e detalhar vendas | 3 |
+| [HU-B06.5](HU-B06.5-listar-detalhar-vendas.md) | Listar e detalhar vendas (extra) | 3 |
 | [HU-B06.6](HU-B06.6-alterar-status-cancelar.md) | Finalizar ou cancelar orçamento | 3 |
 | [HU-B06.7](HU-B06.7-vincular-nota-notificar.md) | Vincular nota à venda e notificar | 2 |

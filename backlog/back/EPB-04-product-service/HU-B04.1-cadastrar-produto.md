@@ -4,37 +4,37 @@
 
 ## História
 
-Como **gerente de estoque**, quero **cadastrar uma peça com seus dados fiscais e a quantidade que já tenho** para **vendê-la e emitir nota corretamente**.
+Como **gerente de estoque**, quero **cadastrar uma peça com a quantidade que já tenho** para **vendê-la e emitir nota corretamente**.
 
 ## Requisitos funcionais
 
-- RF01 — `POST /api/produtos` com `codigo`, `nome`, `descricao`, `ncm`, `cest`, `categoria`, `fabricante`, `codigoFabricante`, `precoCusto`, `precoVenda`, `estoqueMinimo`, `cfop`, `origem`, `cstIcms`, `aliquotaIcms` e `estoqueInicial` (opcional).
-- RF02 — Responde `201` no formato de `GET /api/produtos/{id}`, com `margemLucro = (precoVenda − precoCusto) / precoCusto × 100` (2 casas).
-- RF03 — Na mesma transação (`TransactWriteItems`) grava `products`, `inventory` (`estoqueAtual = estoqueInicial` ou 0, `reservado = 0`, `disponivel`, `status` pela regra da seção 4.3) e, se `estoqueInicial > 0`, uma movimentação `ajuste` com motivo "Estoque inicial".
+- RF01 — `POST /api/produtos` recebe o `ProdutoInput` do front: `codigo`, `nome`, `ncm`, `estoqueAtual`, `estoqueMinimo`, `precoCusto`, `precoVenda`.
+- RF02 — Responde `201` com o `Produto` do front: os mesmos campos + `id` (numérico, `IdGenerator` recurso `produtos`) + `status` calculado (regra da seção 4.3).
+- RF03 — Dados fiscais que a tela não tem (`cfop`, `origem`, `cstIcms`, `aliquotaIcms`) recebem os padrões de configuração do serviço (`5102`, `0`, `00`, 18) e ficam só internos.
+- RF04 — Na mesma transação (`TransactWriteItems`) grava `products`, `inventory` (`estoqueAtual` do corpo, `reservado = 0`, `status`) e, se `estoqueAtual > 0`, uma movimentação `ajuste` com motivo "Estoque inicial".
 
 ## Regras e requisitos não funcionais
 
 - `codigo` único (item-guarda `COD#{codigo}` com `attribute_not_exists`) → `409`.
-- NCM 8 dígitos; CEST 7 dígitos quando informado; CFOP 4 dígitos; `origem` 0–8; `precoVenda > precoCusto`; `estoqueMinimo ≥ 0`; `estoqueInicial ≥ 0`; `aliquotaIcms` entre 0 e 100 → `400` com `campos`.
-- Obrigatórios: `codigo`, `nome`, `ncm`, `categoria`, `precoCusto`, `precoVenda`, `estoqueMinimo`, `cfop`, `origem`, `cstIcms`.
-- Valores monetários como `BigDecimal` com 2 casas.
+- Obrigatórios: todos os campos do `ProdutoInput`. NCM 8 dígitos; `precoVenda > precoCusto`; `estoqueMinimo ≥ 0`; `estoqueAtual ≥ 0` → `400` com `campos`.
+- Valores monetários como `BigDecimal` com 2 casas internamente; serializados como `number`.
 
 ## Critérios de aceite
 
 ```gherkin
 Cenário: cadastro com estoque inicial
-  Quando cadastro "PF-001" com estoqueMinimo 15 e estoqueInicial 30
-  Então recebo 201 com estoque.estoqueAtual 30, estoque.status "ok" e margemLucro calculada
+  Quando cadastro "PF-001" com estoqueMinimo 15 e estoqueAtual 30
+  Então recebo 201 com id numérico, estoqueAtual 30 e status "ok"
   E existe uma movimentação "ajuste" com motivo "Estoque inicial"
 
-Cenário: sem estoque inicial
-  Quando cadastro sem estoqueInicial e com estoqueMinimo 10
-  Então estoque.estoqueAtual é 0 e estoque.status é "critico"
+Cenário: sem estoque
+  Quando cadastro com estoqueAtual 0 e estoqueMinimo 10
+  Então status é "critico"
 
 Cenário: código repetido
   Dado o produto "PF-001"
   Quando cadastro outro "PF-001"
-  Então recebo 409 com campos[0].campo = "codigo"
+  Então recebo 409
 
 Cenário: preço de venda menor que custo
   Quando envio precoCusto 50 e precoVenda 40
@@ -43,9 +43,9 @@ Cenário: preço de venda menor que custo
 
 ## Subtasks
 
-- [ ] ST-B04.1.1 Entidades `Produto`, `Inventario`, `Movimentacao`
+- [ ] ST-B04.1.1 Entidades `Produto`, `Inventario`, `Movimentacao` (ids `long`)
 - [ ] ST-B04.1.2 `StatusEstoqueCalculator` (regra única, reaproveitada no EPB-05)
-- [ ] ST-B04.1.3 `ProdutoService.criar` com transação
+- [ ] ST-B04.1.3 `ProdutoService.criar` com transação e padrões fiscais
 - [ ] ST-B04.1.4 DTOs, validações e controller
 - [ ] ST-B04.1.5 Compose e rota no gateway
 
@@ -54,7 +54,7 @@ Cenário: preço de venda menor que custo
 | ID | Tipo | Cenário | Critério |
 |---|---|---|---|
 | TC-B04.1.1 | Unitário (parametrizado) | `StatusEstoqueCalculator` nos limites 0,4 / 0,7 / 1,0 do mínimo e com mínimo 0 | status |
-| TC-B04.1.2 | Unitário | margem de lucro e arredondamento | RF02 |
-| TC-B04.1.3 | Integração (LocalStack) | cria e confere as 3 tabelas | com estoque inicial |
-| TC-B04.1.4 | Integração | código repetido → 409 | repetido |
-| TC-B04.1.5 | Unitário | validações de NCM, CFOP, preços | inválidos |
+| TC-B04.1.2 | Integração (LocalStack) | cria e confere as 3 tabelas | com estoque inicial |
+| TC-B04.1.3 | Integração | código repetido → 409 | repetido |
+| TC-B04.1.4 | Unitário | validações de NCM e preços | inválidos |
+| TC-B04.1.5 | Contrato | resposta valida contra o tipo `Produto` do front (plano, sem campos a mais) | RF02 |

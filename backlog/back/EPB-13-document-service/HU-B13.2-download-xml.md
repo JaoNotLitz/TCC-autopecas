@@ -8,8 +8,8 @@ Como **responsável fiscal**, quero **baixar o XML de uma nota** para **guardar 
 
 ## Requisitos funcionais
 
-- RF01 — `GET /api/documentos/xml/{notaId}` responde `200` com `Content-Type: application/xml` e `Content-Disposition: attachment; filename="NFe{chave}.xml"` (streaming do S3 pelo serviço).
-- RF02 — Com `?redirect=true`, responde `302` para uma URL pré-assinada (1 h) usando o host público do LocalStack.
+- RF01 — `GET /api/notas/{id}/xml` (caminho do `notasService.baixarXml` do front, roteado pelo gateway para o document-service) responde `200` com `Content-Type: application/xml` e `Content-Disposition: attachment; filename="NFe{chave}.xml"` (streaming do S3 pelo serviço).
+- RF02 — Sem redirect para URL pré-assinada: o S3 recusa o header `Authorization` que o `fetch` do front envia.
 - RF03 — Nota sem XML (`processando` antes do processor) → `404` "XML ainda não disponível".
 
 ## Critérios de aceite
@@ -17,13 +17,13 @@ Como **responsável fiscal**, quero **baixar o XML de uma nota** para **guardar 
 ```gherkin
 Cenário: baixar XML autorizado
   Dado uma nota autorizada
-  Quando chamo GET /api/documentos/xml/{id}
+  Quando chamo GET /api/notas/{id}/xml
   Então recebo o nfeProc com o nome NFe{chave}.xml
 ```
 
 ## Subtasks
 
-- [ ] ST-B13.2.1 Endpoint de streaming e modo redirect
+- [ ] ST-B13.2.1 Endpoint de streaming
 
 ## Testes
 
