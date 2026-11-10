@@ -48,7 +48,7 @@ O sistema WC Autopeças é uma plataforma completa de gestão para lojas de auto
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                    CAMADA DE FRONTEND                            │
-│                     Angular 22 SPA                               │
+│              React 18 + Vite SPA (repo dinastiadoge/tcc)         │
 │              (Executado no navegador do usuário)                 │
 └──────────────────────────┬──────────────────────────────────────┘
                            │ HTTPS (TLS 1.3)
@@ -69,15 +69,17 @@ O sistema WC Autopeças é uma plataforma completa de gestão para lojas de auto
 ┌─────────────────────────────────────────────────────────────────┐
 │          APPLICATION LOAD BALANCER (ALB)                         │
 │  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Path-based Routing:                                       │  │
+│  │ Path-based Routing (mais específica primeiro):            │  │
+│  │ /api/notas/entrada*      → entry-service:8085             │  │
+│  │ /api/notas/*/xml|pdf     → document-service:8086          │  │
+│  │ /api/notas/lote-contador → document-service:8086          │  │
+│  │ /api/notas/relatorio     → reports-service:8087           │  │
 │  │ /api/auth/*       → auth-service:8080                     │  │
 │  │ /api/clientes/*   → customer-service:8081                 │  │
 │  │ /api/produtos/*   → product-service:8082                  │  │
 │  │ /api/vendas/*     → sales-service:8083                    │  │
-│  │ /api/notas/*      → fiscal-service:8084                   │  │
-│  │ /api/entrada/*    → entry-service:8085                    │  │
-│  │ /api/documentos/* → document-service:8086                 │  │
-│  │ /api/dashboard/*  → reports-service:8087                  │  │
+│  │ /api/notas/*, /api/inutilizacoes → fiscal-service:8084    │  │
+│  │ /api/dashboard, /api/relatorios/* → reports-service:8087  │  │
 │  └───────────────────────────────────────────────────────────┘  │
 └────┬──────┬──────┬──────┬──────┬──────┬──────┬──────┬──────────┘
      │      │      │      │      │      │      │      │
@@ -309,14 +311,17 @@ O sistema WC Autopeças é uma plataforma completa de gestão para lojas de auto
 
 **Path-based Routing Rules:**
 ```
-/api/auth/*       → tg-auth-service
-/api/clientes/*   → tg-customer-service
-/api/produtos/*   → tg-product-service
-/api/vendas/*     → tg-sales-service
-/api/notas/*      → tg-fiscal-service
-/api/entrada/*    → tg-entry-service
-/api/documentos/* → tg-document-service
-/api/dashboard/*  → tg-reports-service
+# Regras mais específicas têm prioridade menor (avaliadas antes)
+/api/notas/entrada, /api/notas/entrada/*      → tg-entry-service
+/api/notas/*/xml, /api/notas/*/pdf            → tg-document-service
+/api/notas/lote-contador                      → tg-document-service
+/api/notas/relatorio                          → tg-reports-service
+/api/auth/*                                   → tg-auth-service
+/api/clientes, /api/clientes/*                → tg-customer-service
+/api/produtos, /api/produtos/*                → tg-product-service
+/api/vendas, /api/vendas/*                    → tg-sales-service
+/api/notas, /api/notas/*, /api/inutilizacoes  → tg-fiscal-service
+/api/dashboard, /api/relatorios/*             → tg-reports-service
 ```
 
 ### 3.3 API Gateway
@@ -342,7 +347,7 @@ O sistema WC Autopeças é uma plataforma completa de gestão para lojas de auto
 Type: REQUEST (Lambda Authorizer)
 Identity Source: $request.header.Authorization
 Validação: assinatura HS512 com a chave wc-jwt-secret (Secrets Manager) + expiração
-Rotas públicas (sem authorizer): POST /api/auth/login, POST /api/auth/refresh
+Rotas públicas (sem authorizer): POST /api/auth/login
 Contexto repassado aos serviços: usuarioId, papel
 ```
 
@@ -354,6 +359,7 @@ Contexto repassado aos serviços: usuarioId, papel
 
 | Tabela | Partition Key | Sort Key | GSI | Streams | Função |
 |--------|--------------|----------|-----|---------|---------|
+| **counters** | recurso | - | - | Não | Último id numérico de cada recurso (`clientes`, `produtos`, `vendas`, `notas`, `inutilizacoes`, `fornecedores`, `usuarios`, `movimentos`, `entradas`); incrementado com `UpdateItem ADD valor :1` |
 | **users** | id | - | email-index | Sim | Dados de usuários do sistema |
 | **customers** | id | - | documento-index, email-index, status-index | Sim | Clientes PF/PJ |
 | **products** | id | - | codigo-index, categoria-index | Sim | Catálogo de produtos |
@@ -364,7 +370,10 @@ Contexto repassado aos serviços: usuarioId, papel
 | **notas_fiscais** | id | - | status-index, venda-index, chave-index | Sim | Notas fiscais emitidas |
 | **notas_items** | notaId | itemId | - | Não | Itens de cada nota |
 | **fiscal_events** | id | - | nota-index, tipo-index | Não | Cancelamentos, inutilizações |
-| **entry_notes** | id | - | fornecedor-index, data-index | Sim | Notas de entrada |
+| **entry_notes** | id | - | fornecedor-index, data-index, chave-index | Sim | Notas de entrada |
+| **suppliers** | cnpj | - | - | Não | Fornecedores (com `id` numérico), gravados a partir das notas de entrada |
+
+> Todas as chaves `id` são `number` (inteiro sequencial do `counters`), como o front espera. A partir daqui, os exemplos de eventos usam ids numéricos.
 
 **Configuração Global:**
 - **Capacity Mode:** On-Demand (auto-scaling)
@@ -464,7 +473,7 @@ lock:{resource}                           → Distributed lock
 
 #### **Responsabilidades:**
 1. Autenticar usuários via email/senha
-2. Gerar tokens JWT (access + refresh)
+2. Gerar o token JWT de acesso (8h; sem refresh token, o front volta ao login no `401`)
 3. Validar tokens em requisições
 4. Gerenciar sessões ativas no Redis
 5. Controlar tentativas de login e bloqueio
@@ -513,10 +522,10 @@ lock:{resource}                           → Distributed lock
 ```json
 {
   "eventType": "customer.created | customer.updated | customer.deactivated",
-  "customerId": "uuid",
+  "customerId": 42,
   "timestamp": "ISO8601",
   "data": {
-    "id": "uuid",
+    "id": 42,
     "nome": "string",
     "email": "string",
     "documento": "string"
@@ -561,9 +570,9 @@ lock:{resource}                           → Distributed lock
 ```json
 {
   "type": "reserve | release | decrease | increase | adjust",
-  "produtoId": "uuid",
+  "produtoId": 42,
   "quantidade": "number",
-  "referenciaId": "uuid (vendaId ou entryId)",
+  "referenciaId": 42,
   "timestamp": "ISO8601"
 }
 ```
@@ -619,9 +628,9 @@ ok       → estoqueAtual >= estoqueMinimo
 ```json
 {
   "type": "reserve",
-  "produtoId": "uuid",
+  "produtoId": 42,
   "quantidade": 5,
-  "vendaId": "uuid",
+  "vendaId": 42,
   "timestamp": "ISO8601"
 }
 ```
@@ -631,7 +640,7 @@ ok       → estoqueAtual >= estoqueMinimo
 ```json
 {
   "eventType": "sale.created",
-  "saleId": "uuid",
+  "saleId": 42,
   "tipoDocumento": "nfe | nfce",
   "timestamp": "ISO8601"
 }
@@ -705,7 +714,7 @@ ok       → estoqueAtual >= estoqueMinimo
 ```json
 {
   "eventType": "nota.autorizada",
-  "notaId": "uuid",
+  "notaId": 42,
   "chaveAcesso": "44 dígitos",
   "timestamp": "ISO8601"
 }
@@ -726,11 +735,12 @@ ok       → estoqueAtual >= estoqueMinimo
 **Bounded Context:** Inbound Logistics
 
 #### **Responsabilidades:**
-1. Registrar notas fiscais de entrada manualmente
-2. Fazer upload de XMLs de fornecedores
-3. Importar e parsear XMLs de entrada
-4. Validar dados do XML
+1. Registrar notas fiscais de entrada (`POST /api/notas/entrada`), vindas do formulário da tela
+2. Ler o XML do fornecedor e devolver os dados para a tela conferir (`POST /api/notas/entrada/importar-xml`, síncrono, sem gravar)
+3. Validar dados da nota e casar os itens com o catálogo pelo `codigo`
+4. Manter o cadastro de fornecedores (`suppliers`) a partir das notas
 5. Atualizar estoque com entrada de mercadorias
+6. *(Extensão, sem uso no front atual)* importação assíncrona em lote via S3 + `entry-events-queue`
 
 #### **Dependências:**
 - **DynamoDB:** Tabelas `entry_notes`
@@ -744,8 +754,14 @@ ok       → estoqueAtual >= estoqueMinimo
   - SQS `entry-events-queue`
   - SQS `inventory-updates-queue`
 
-#### **Fluxo de Importação XML:**
-1. Frontend faz upload do XML (multipart/form-data)
+#### **Fluxo usado pelo front:**
+1. A tela envia o XML (`multipart/form-data`, campo `arquivo`) para `POST /api/notas/entrada/importar-xml`
+2. O serviço faz o parse e devolve um `EntradaInput` preenchido, sem gravar nada
+3. O usuário confere e confirma com `POST /api/notas/entrada`
+4. O serviço grava `entry_notes`, atualiza `suppliers`, publica `increase` por item na `inventory-updates-queue` e chama `POST /internal/notas/entrada` no Fiscal Service, que grava a nota `ENTRADA` (listada em `GET /api/notas`) e devolve a `NotaFiscal` da resposta
+
+#### **Fluxo de importação assíncrona (extensão):**
+1. Upload do XML para importação em lote
 2. Entry Service salva no S3
 3. Publica evento na `entry-events-queue`
 4. Listener consome e processa:
@@ -761,7 +777,7 @@ ok       → estoqueAtual >= estoqueMinimo
 ```json
 {
   "eventType": "entry.uploaded",
-  "entryId": "uuid",
+  "entryId": 42,
   "s3Key": "fornecedor/12345678901234/2024/09/nota.xml",
   "timestamp": "ISO8601"
 }
@@ -772,9 +788,9 @@ ok       → estoqueAtual >= estoqueMinimo
 ```json
 {
   "type": "increase",
-  "produtoId": "uuid",
+  "produtoId": 42,
   "quantidade": 100,
-  "entryId": "uuid",
+  "entryId": 42,
   "timestamp": "ISO8601"
 }
 ```
@@ -795,9 +811,8 @@ ok       → estoqueAtual >= estoqueMinimo
 
 #### **Responsabilidades:**
 1. Gerar PDF (DANFE) de notas autorizadas
-2. Fornecer download de XML/PDF
-3. Gerar presigned URLs do S3
-4. Criar ZIPs de lotes de notas para contador
+2. Servir os bytes do XML e do PDF em `GET /api/notas/{id}/xml` e `/pdf` (sem redirect para o S3, porque o front baixa com header `Authorization`)
+3. Criar ZIPs de lotes de notas para contador (`POST /api/notas/lote-contador`) e enviar o link por e-mail
 
 #### **Dependências:**
 - **S3:** Bucket `wc-documents-bucket`
@@ -825,7 +840,7 @@ ok       → estoqueAtual >= estoqueMinimo
 
 #### **Responsabilidades:**
 1. Fornecer dados do dashboard
-2. Gerar relatórios CSV/Excel
+2. Gerar relatórios CSV, incluindo o relatório de notas do Painel Fiscal (`GET /api/notas/relatorio`)
 3. Agregar estatísticas de vendas, estoque e fiscal
 4. Cache de estatísticas (Redis)
 
@@ -919,584 +934,185 @@ Qual seção quer ver agora? 🎯
 
 ## 5. APIs e Endpoints
 
+> **O back segue o front.** Esta seção é o contrato que o front React (`dinastiadoge/tcc`, pastas `src/app/types/index.ts` e `src/app/services/`) já consome. Nomes de campos, tipos, caminhos e formatos de resposta vêm de lá. Quando o back precisar de algo que o front ainda não tem, isso aparece como **extra** (campo ou endpoint a mais, que o front ignora) ou na seção 5.10 (pontos que dependem de um PR no front).
+
 ### 5.0 Convenções gerais (valem para todos os serviços)
 
-**IDs:** UUID em `string`.
+**URL base.** Todos os caminhos desta seção são relativos a `/api`. O front monta a URL como `VITE_API_URL + caminho`, então em ambiente local `VITE_API_URL` aponta para o stage do API Gateway **já com `/api`** (ex.: `http://wcapi.execute-api.localhost.localstack.cloud:4566/local/api`). Sem a variável, o front usa `/api` relativo (proxy do Vite ou mesmo domínio).
 
-**Datas:** ISO 8601 (`2024-09-20T15:00:00Z`); datas sem hora em `yyyy-MM-dd`.
+**IDs:** `number` inteiro, sequencial por recurso, gerado pela tabela `counters` do DynamoDB (`UpdateItem` com `ADD valor :1`, atômico). `numero` e `serie` de nota fiscal continuam `string`.
 
-**Documento, telefone, CEP e NCM:** só dígitos, sem máscara.
+**Datas:** ISO 8601 (`2026-09-20T15:00:00Z`). Filtros `de`/`ate` e datas sem hora em `yyyy-MM-dd`.
 
-**Enums:** `tipoDocumento` da venda é minúsculo (`nfe|nfce`); `tipo` da nota fiscal é maiúsculo (`NFE|NFCE|DEVOLUCAO|ENTRADA`). Os demais enums (status, método de pagamento etc.) são minúsculos.
+**Dinheiro:** `number` em reais (`89.9`). **Documento, telefone e NCM:** só dígitos. A formatação é da tela.
 
-**Listagens:** todo `GET` de coleção aceita `limit` (default 20, max 100) e `lastKey` (cursor) e responde no mesmo envelope:
+**Enums:** `tipoDocumento` da venda é minúsculo (`nfe|nfce`); `tipo` da nota é maiúsculo (`NFE|NFCE|DEVOLUCAO|ENTRADA`). Demais enums minúsculos. Valores exatos na seção 5.10.
+
+**Listagens:** todo `GET` de coleção responde **um array JSON puro** (`[ {...}, {...} ]`), sem envelope e sem paginação. O volume de uma loja cabe numa resposta; o serviço pagina o DynamoDB internamente até o fim e aplica os filtros. Ordem padrão: mais recente primeiro (notas, inutilizações) ou alfabética (clientes, produtos).
+
+**Respostas sem corpo:** `204 No Content` (o front devolve `undefined`).
+
+**Downloads** (XML, PDF, relatório): o serviço devolve **os bytes do arquivo** com `Content-Type` e `Content-Disposition`. Não usar redirect para URL pré-assinada do S3: o front baixa com `fetch` e header `Authorization`, e o S3 recusa esse header.
+
+**Formato de erro** (todo 4xx/5xx), JSON:
 ```json
 {
-  "items": [ ... ],
-  "lastKey": "base64-encoded-key",
-  "count": 20
-}
-```
-- `count` é a quantidade de itens **desta página**, não o total da coleção (DynamoDB não fornece total barato). Totais vêm do `GET /api/dashboard` ou de `/resumo`.
-- `lastKey` ausente ou `null` indica a última página.
-
-**Formato de erro** (todo status 4xx/5xx):
-```json
-{
+  "message": "Documento já cadastrado",
   "status": 409,
   "erro": "CONFLICT",
-  "message": "Documento já cadastrado",
-  "campos": [
-    { "campo": "documento", "message": "Já existe cliente com este documento" }
-  ]
+  "campos": [ { "campo": "documento", "message": "Já existe cliente com este documento" } ]
 }
 ```
-- `message` é sempre presente e pode ser exibida ao usuário.
-- `campos` aparece só em erros de validação (`400`/`422`).
-- `401` = token ausente, inválido ou expirado; `403` = usuário autenticado sem permissão para a operação (papel insuficiente).
+- `message` é obrigatório e é o que o front mostra (`ApiError.message`). Os demais campos são extras.
+- `401` = token ausente, inválido ou expirado: o front apaga o token e volta ao login.
+- `403` = papel sem permissão: o front mostra a `message` sem deslogar.
+
+**Autenticação:** `Authorization: Bearer <token>` em toda rota, exceto `POST /auth/login`. O token vive só no `sessionStorage` do navegador.
 
 ---
 
 ### 5.1 Auth Service (Port 8080)
 
-**Base Path:** `/api/auth`
-
-#### **POST /api/auth/login**
-**Função:** Autenticar usuário e gerar tokens JWT
-
+#### **POST /auth/login**
 **Request:**
 ```json
-{
-  "email": "admin@wcautopecas.com.br",
-  "senha": "senha123"
-}
+{ "email": "admin@wcautopecas.com.br", "senha": "senha123" }
 ```
 
-**Response (200 OK):**
+**Response (200 OK)** — `LoginResponse`:
 ```json
 {
   "token": "eyJhbGciOiJIUzUxMiJ9...",
-  "refreshToken": "eyJhbGciOiJIUzUxMiJ9...",
-  "usuario": {
-    "id": "uuid",
-    "nome": "Administrador",
-    "email": "admin@wcautopecas.com.br",
-    "papel": "ADMIN"
-  },
-  "expiresIn": 28800
+  "usuario": { "id": 1, "nome": "Administrador", "email": "admin@wcautopecas.com.br", "papel": "ADMIN" }
 }
 ```
+- `papel` é **extra** (o tipo `Usuario` do front tem só `id`, `nome`, `email`); fica pronto para o guard por papel (história H13 do front).
+- Token válido por 8h. Não há refresh token: expirou, a próxima chamada recebe `401` e o front volta ao login.
 
-**Validações:**
-- Email válido e obrigatório
-- Senha obrigatória
-- Usuário deve estar ativo
-- Verificar bloqueio temporário (após 5 tentativas falhas)
+**Validações e efeitos:** e-mail e senha obrigatórios; usuário ativo; bloqueio de 15 min após 5 tentativas erradas; contador zera no sucesso; cria sessão no Redis (TTL 8h); atualiza `ultimoLogin`.
 
-**Efeitos Colaterais:**
-- Incrementa contador de tentativas se senha incorreta
-- Bloqueia usuário por 15min após 5 tentativas
-- Reseta contador se login bem-sucedido
-- Cria sessão no Redis (TTL: 8h)
-- Atualiza campo `ultimoLogin`
+**Erros:** `400` dados inválidos · `401` credenciais inválidas · `423` usuário bloqueado.
 
-**Erros:**
-- `401 Unauthorized`: Credenciais inválidas
-- `423 Locked`: Usuário bloqueado temporariamente
-- `400 Bad Request`: Dados de entrada inválidos
+#### **GET /auth/me**
+**Response (200 OK)** — `Usuario`: `{ "id": 1, "nome": "Administrador", "email": "...", "papel": "ADMIN" }`
 
----
+Chamado pelo front ao recarregar a página para validar o token salvo. Exige token válido, sessão no Redis e usuário ativo; senão `401`.
 
-#### **POST /api/auth/logout**
-**Função:** Invalidar token e encerrar sessão
-
-**Headers:**
-```
-Authorization: Bearer {token}
-```
-
-**Response (204 No Content)**
-
-**Efeitos Colaterais:**
-- Remove sessão do Redis
-- Adiciona token à blacklist (opcional)
-
-**Erros:**
-- `401 Unauthorized`: Token inválido ou expirado
-
----
-
-#### **GET /api/auth/me**
-**Função:** Obter dados do usuário autenticado
-
-**Headers:**
-```
-Authorization: Bearer {token}
-```
-
-**Response (200 OK):**
-```json
-{
-  "id": "uuid",
-  "nome": "Administrador",
-  "email": "admin@wcautopecas.com.br",
-  "papel": "ADMIN"
-}
-```
-
-**Validações:**
-- Token deve ser válido
-- Sessão deve existir no Redis
-- Usuário deve estar ativo
-
-**Erros:**
-- `401 Unauthorized`: Token inválido ou sessão expirada
-
----
-
-#### **POST /api/auth/refresh**
-**Função:** Renovar access token usando refresh token
-
-**Request:**
-```json
-{
-  "refreshToken": "eyJhbGciOiJIUzUxMiJ9..."
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "token": "eyJhbGciOiJIUzUxMiJ9...",
-  "refreshToken": "eyJhbGciOiJIUzUxMiJ9...",
-  "usuario": {...},
-  "expiresIn": 28800
-}
-```
-
-**Validações:**
-- Refresh token deve ser válido e não expirado
-- Usuário deve estar ativo
-
-**Efeitos Colaterais:**
-- Gera novo access token
-- Mantém refresh token (ou gera novo)
-- Cria nova sessão no Redis
-
-**Erros:**
-- `401 Unauthorized`: Refresh token inválido
+#### **POST /auth/logout** *(extra)*
+Remove a sessão do Redis e responde `204`. O front atual só apaga o token local; o endpoint fica disponível para quando ele passar a chamá-lo.
 
 ---
 
 ### 5.2 Customer Service (Port 8081)
 
-**Base Path:** `/api/clientes`
-
-#### **GET /api/clientes**
-**Função:** Listar/buscar clientes com filtros
-
-**Query Parameters:**
-- `tipo` (opcional): `PF` ou `PJ`
-- `busca` (opcional): Texto para buscar em nome, email ou documento
-- `cidade` (opcional): Filtro por cidade
-- `uf` (opcional): Filtro por UF
-- `ativo` (opcional): `true` ou `false`
-- `documento` (opcional): CPF/CNPJ exato, só dígitos (consulta direta no GSI de documento; retorna 0 ou 1 item)
-- `limit` (opcional): Número de resultados (default: 20, max: 100)
-- `lastKey` (opcional): Cursor para paginação
-
-**Response (200 OK):**
+**Modelo `Cliente`:**
 ```json
 {
-  "items": [
-    {
-      "id": "uuid",
-      "tipo": "PJ",
-      "documento": "12345678901234",
-      "nome": "Auto Peças Silva LTDA",
-      "email": "contato@silva.com.br",
-      "telefone": "11987654321",
-      "cidade": "São Paulo",
-      "uf": "SP",
-      "ativo": true,
-      "totalCompras": 150,
-      "valorTotalCompras": 45000.00,
-      "ultimaCompra": "2024-09-15T14:30:00Z"
-    }
-  ],
-  "lastKey": "base64-encoded-key",
-  "count": 20
-}
-```
-
-**Comportamento:**
-- Se `documento` for informado: query exata no GSI de documento (usado pelo PDV para localizar o cliente)
-- Se `busca` contém apenas números: busca por documento (GSI)
-- Caso contrário: scan com filtro em nome e email
-- Cache de 5 minutos para queries comuns
-
-**Erros:**
-- `400 Bad Request`: Parâmetros inválidos
-
----
-
-#### **GET /api/clientes/{id}**
-**Função:** Obter detalhes de um cliente específico
-
-**Response (200 OK):**
-```json
-{
-  "id": "uuid",
+  "id": 12,
   "tipo": "PJ",
-  "documento": "12345678901234",
+  "documento": "12345678000190",
   "nome": "Auto Peças Silva LTDA",
-  "nomeFantasia": "Silva Autopeças",
   "email": "contato@silva.com.br",
   "telefone": "11987654321",
-  "cep": "01310100",
-  "logradouro": "Av. Paulista",
-  "numero": "1000",
-  "complemento": "Sala 10",
-  "bairro": "Bela Vista",
   "cidade": "São Paulo",
   "uf": "SP",
-  "inscricaoEstadual": "123456789",
   "ativo": true,
-  "dataCriacao": "2024-01-15T10:00:00Z",
-  "dataAtualizacao": "2024-09-20T15:30:00Z",
-  "totalCompras": 150,
-  "valorTotalCompras": 45000.00,
-  "ultimaCompra": "2024-09-15T14:30:00Z"
+  "totalCompras": 42,
+  "ultimaCompra": "2026-04-23T14:30:00Z"
 }
 ```
+- `totalCompras` = quantidade de vendas finalizadas do cliente; `ultimaCompra` = data da última, ou `null`. Mantidos pelo próprio Customer Service a partir dos eventos de venda.
 
-**Cache:** Redis 1 hora
+**`ClienteInput`** (corpo de POST e PUT) = `Cliente` sem `id`, `totalCompras` e `ultimaCompra`: `tipo`, `documento`, `nome`, `email`, `telefone`, `cidade`, `uf`, `ativo`.
 
-**Erros:**
-- `404 Not Found`: Cliente não encontrado
+#### **GET /clientes**
+**Query:** `tipo` (`PF|PJ`), `busca` (texto em nome, e-mail ou documento), `documento` (CPF/CNPJ exato, só dígitos; usa o GSI `documento-index` e devolve 0 ou 1 item). Todos opcionais.
 
----
+**Response (200 OK):** `Cliente[]`
 
-#### **POST /api/clientes**
-**Função:** Criar novo cliente
+#### **POST /clientes**
+**Response (201 Created):** `Cliente`
 
-**Request:**
-```json
-{
-  "tipo": "PJ",
-  "documento": "12345678901234",
-  "nome": "Auto Peças Silva LTDA",
-  "nomeFantasia": "Silva Autopeças",
-  "email": "contato@silva.com.br",
-  "telefone": "11987654321",
-  "cep": "01310100",
-  "logradouro": "Av. Paulista",
-  "numero": "1000",
-  "bairro": "Bela Vista",
-  "cidade": "São Paulo",
-  "uf": "SP",
-  "inscricaoEstadual": "123456789"
-}
-```
+**Validações:** `tipo`, `documento` e `nome` obrigatórios; CPF (11 dígitos) ou CNPJ (14) válido e coerente com `tipo`; documento único; e-mail único quando informado; telefone com 10 ou 11 dígitos quando informado; `uf` entre as 27 siglas.
 
-**Response (201 Created):**
-```json
-{
-  "id": "uuid",
-  ...todos os campos...
-}
-```
+**Efeitos:** publica `customer.created`; e-mail de boas-vindas se houver e-mail.
 
-**Campos obrigatórios:** `tipo`, `documento`, `nome`.
-**Opcionais:** `nomeFantasia`, `email`, `telefone`, `inscricaoEstadual` e todo o endereço (`cep`, `logradouro`, `numero`, `complemento`, `bairro`, `cidade`, `uf`). Isso permite o cadastro rápido no PDV (NFC-e). O endereço completo passa a ser exigido na emissão de NF-e (ver `POST /api/vendas`).
+**Erros:** `400` · `409` documento ou e-mail já cadastrado.
 
-**Validações (quando o campo for informado):**
-- CPF/CNPJ válido conforme algoritmo
-- Documento único (não pode existir outro cliente com mesmo documento)
-- Email único
-- Telefone: 10 ou 11 dígitos
-- CEP: 8 dígitos
-- UF: uma das 27 siglas válidas
-- Se `nomeFantasia` não for informado para PJ, assume o valor de `nome`
+#### **PUT /clientes/{id}**
+Corpo `ClienteInput`; mesmas validações. `ativo: true` reativa um cliente desativado. **Response (200 OK):** `Cliente`. Publica `customer.updated`. **Erros:** `400` · `404` · `409`.
 
-**Efeitos Colaterais:**
-- Publica evento `customer.created` na fila `customer-events-queue`
-- Email de boas-vindas enviado (via Notification Service), apenas se `email` foi informado
+#### **DELETE /clientes/{id}**
+Soft delete (`ativo = false`). **Response:** `204`. Publica `customer.deactivated`. Exige papel `ADMIN`. **Erros:** `403` · `404`.
 
-**Erros:**
-- `400 Bad Request`: Dados inválidos
-- `409 Conflict`: Documento ou email já cadastrado
-
----
-
-#### **PUT /api/clientes/{id}**
-**Função:** Atualizar dados de cliente existente
-
-**Request:** Igual ao POST
-
-**Response (200 OK):** Cliente atualizado
-
-**Validações:** Iguais ao POST
-
-**Efeitos Colaterais:**
-- Publica evento `customer.updated` na fila `customer-events-queue`
-- Invalida cache Redis do cliente
-
-**Erros:**
-- `404 Not Found`: Cliente não existe
-- `409 Conflict`: Documento/email em uso por outro cliente
-
----
-
-#### **DELETE /api/clientes/{id}**
-**Função:** Desativar cliente (soft delete)
-
-**Response (204 No Content)**
-
-**Efeitos Colaterais:**
-- Define `ativo = false`
-- Publica evento `customer.deactivated`
-- Invalida cache
-
-**Erros:**
-- `404 Not Found`: Cliente não existe
+#### **GET /clientes/{id}** *(extra)*
+Devolve um `Cliente`. Usado pelas chamadas internas (Sales).
 
 ---
 
 ### 5.3 Product Service (Port 8082)
 
-**Base Path:** `/api/produtos`
-
-#### **GET /api/produtos**
-**Função:** Listar produtos com busca
-
-**Query Parameters:**
-- `busca` (opcional): Busca em nome, código ou NCM
-- `categoria` (opcional): Filtro por categoria
-- `status` (opcional): `ok|atencao|baixo|critico`
-- `ativo` (opcional): `true|false`
-- `limit` (opcional): Default 20, max 100
-- `lastKey` (opcional): Cursor para paginação
-
-**Response (200 OK):**
+**Modelo `Produto`:**
 ```json
 {
-  "items": [
-    {
-      "id": "uuid",
-      "codigo": "PF-001",
-      "nome": "Pastilha de Freio Dianteira",
-      "ncm": "87083010",
-      "categoria": "Freios",
-      "precoCusto": 45.50,
-      "precoVenda": 89.90,
-      "estoqueMinimo": 15,
-      "ativo": true,
-      "estoque": {
-        "estoqueAtual": 45,
-        "reservado": 5,
-        "disponivel": 40,
-        "status": "ok"
-      }
-    }
-  ],
-  "lastKey": "base64-encoded-key",
-  "count": 20
-}
-```
-
-> O estoque vem sempre no objeto `estoque`, na listagem e no detalhe.
-
-**Cache:** Produtos mais consultados (1 hora)
-
----
-
-#### **GET /api/produtos/{id}**
-**Função:** Detalhes do produto + estoque
-
-**Response (200 OK):**
-```json
-{
-  "id": "uuid",
+  "id": 7,
   "codigo": "PF-001",
   "nome": "Pastilha de Freio Dianteira",
-  "descricao": "Pastilha para veículos nacionais",
   "ncm": "87083010",
-  "cest": "0100100",
-  "categoria": "Freios",
-  "fabricante": "Fras-le",
-  "codigoFabricante": "PD123",
-  "precoCusto": 45.50,
-  "precoVenda": 89.90,
-  "margemLucro": 97.58,
+  "estoqueAtual": 45,
   "estoqueMinimo": 15,
-  "ativo": true,
-  "dataCriacao": "2024-01-10T10:00:00Z",
-  "dataAtualizacao": "2024-09-20T14:00:00Z",
-  "estoque": {
-    "estoqueAtual": 45,
-    "reservado": 5,
-    "disponivel": 40,
-    "status": "ok",
-    "ultimaMovimentacao": "2024-09-20T14:00:00Z"
-  }
+  "precoCusto": 45.5,
+  "precoVenda": 89.9,
+  "status": "ok"
 }
 ```
+- `status` é **calculado pelo back** (`ok|atencao|baixo|critico`, regra da seção 4.3). O front não manda.
 
-**Erros:**
-- `404 Not Found`: Produto não existe
+**`ProdutoInput`** (POST e PUT) = `Produto` sem `id` e `status`: `codigo`, `nome`, `ncm`, `estoqueAtual`, `estoqueMinimo`, `precoCusto`, `precoVenda`.
 
----
+Dados fiscais do produto que a tela não tem (CFOP, origem, CST, alíquota de ICMS) usam os valores padrão de configuração do serviço (`5102`, `0`, `00`, 18%).
 
-#### **POST /api/produtos**
-**Função:** Criar novo produto
+#### **GET /produtos**
+**Query:** `busca` (nome, código ou NCM), `status` (um valor). Opcionais. Só produtos ativos.
 
-**Request:**
+**Response (200 OK):** `Produto[]`
+
+#### **GET /produtos/resumo**
+**Response (200 OK)** — `ResumoEstoque`:
 ```json
-{
-  "codigo": "PF-001",
-  "nome": "Pastilha de Freio Dianteira",
-  "descricao": "Pastilha para veículos nacionais",
-  "ncm": "87083010",
-  "categoria": "Freios",
-  "precoCusto": 45.50,
-  "precoVenda": 89.90,
-  "estoqueMinimo": 15,
-  "cfop": "5102",
-  "origem": "0",
-  "cstIcms": "00",
-  "aliquotaIcms": 18.00,
-  "estoqueInicial": 30
-}
+{ "totalProdutos": 847, "estoqueBaixo": 23, "valorEmEstoque": 145890.0, "itensCriticos": 8 }
 ```
+- `estoqueBaixo` = produtos com status `baixo` ou `critico`; `itensCriticos` = só `critico`; `valorEmEstoque` = Σ `estoqueAtual × precoCusto`. Cache de 5 min.
 
-**Response (201 Created):** Produto criado (mesmo formato de `GET /api/produtos/{id}`)
+#### **POST /produtos**
+**Response (201 Created):** `Produto`
 
-**Validações:**
-- Código único
-- NCM: 8 dígitos
-- Preço venda > preço custo
-- Estoque mínimo >= 0
-- `estoqueInicial` (opcional) >= 0
+**Validações:** código único; NCM com 8 dígitos; `precoVenda` > `precoCusto`; `estoqueMinimo` ≥ 0; `estoqueAtual` ≥ 0.
 
-**Efeitos Colaterais:**
-- Cria registro em `inventory` com `estoqueInicial` (ou 0 se omitido)
-- Se `estoqueInicial` > 0: registra movimentação tipo `ajuste` com motivo "Estoque inicial"
+**Efeitos:** cria o registro em `inventory` com `estoqueAtual`; se > 0, registra movimentação `ajuste` com motivo "Estoque inicial".
 
-**Erros:**
-- `409 Conflict`: Código já existe
+**Erros:** `400` · `409` código já existe.
 
----
+#### **PUT /produtos/{id}**
+Corpo `ProdutoInput`. **Response (200 OK):** `Produto` com o `status` recalculado.
 
-#### **PUT /api/produtos/{id}**
-**Função:** Atualizar produto
+Se `estoqueAtual` vier diferente do atual, o serviço registra uma movimentação `ajuste` com motivo "Ajuste pela tela de estoque" e o `usuarioId` do token, publica `adjust` na `inventory-updates-queue` e responde já com o valor novo. Alterar quantidade exige papel `ADMIN` (`403` para VENDEDOR; os demais campos o VENDEDOR pode editar).
 
-**Request:** Igual ao POST, sem `estoqueInicial`. Este endpoint **não altera a quantidade em estoque**; para isso use `POST /api/produtos/{id}/ajuste`, que exige motivo e registra a movimentação.
+**Erros:** `400` · `403` · `404` · `409` código em uso.
 
-**Response (200 OK):** Produto atualizado (mesmo formato de `GET /api/produtos/{id}`)
+#### **DELETE /produtos/{id}**
+Soft delete. **Response:** `204`. Exige `ADMIN`. **Erros:** `403` · `404` · `409` produto com estoque reservado.
 
-**Efeitos Colaterais:**
-- Invalida cache Redis
-- Recalcula margem de lucro
-
----
-
-#### **DELETE /api/produtos/{id}**
-**Função:** Desativar produto (soft delete)
-
-**Response (204 No Content)**
-
-**Regras:**
-- Não pode desativar se houver estoque reservado
-
-**Erros:**
-- `404 Not Found`: Produto não existe
-- `409 Conflict`: Produto com estoque reservado
-
----
-
-#### **GET /api/produtos/resumo**
-**Função:** Estatísticas de estoque
-
-**Response (200 OK):**
-```json
-{
-  "totalProdutos": 847,
-  "produtosBaixo": 23,
-  "produtosCriticos": 8,
-  "valorTotalEstoque": 145890.00,
-  "produtosAtivos": 820,
-  "produtosInativos": 27
-}
-```
-
-**Cache:** 5 minutos
-
----
-
-#### **GET /api/produtos/{id}/movimentos**
-**Função:** Histórico de movimentações de estoque
-
-**Query Parameters:**
-- `de` (opcional): Data inicial (ISO8601)
-- `ate` (opcional): Data final
-- `tipo` (opcional): `entrada|saida|ajuste|reserva|liberacao`
-- `limit` (opcional): Default 50
-- `lastKey` (opcional): Cursor para paginação
-
-**Response (200 OK):**
-```json
-{
-  "items": [
-    {
-      "id": "uuid",
-      "produtoId": "uuid",
-      "tipo": "saida",
-      "quantidade": -5,
-      "estoqueAnterior": 50,
-      "estoqueNovo": 45,
-      "referenciaId": "venda-uuid",
-      "referenciaType": "sale",
-      "usuarioId": "uuid",
-      "data": "2024-09-20T14:30:00Z"
-    }
-  ]
-}
-```
-
----
-
-#### **POST /api/produtos/{id}/ajuste**
-**Função:** Ajuste manual de estoque
-
-**Request:**
-```json
-{
-  "quantidadeNova": 100,
-  "motivo": "Inventário físico"
-}
-```
-
-**Response (200 OK):** Estoque atualizado
-
-**Efeitos Colaterais:**
-- Publica evento `adjust` na `inventory-updates-queue`
-- Registra movimentação com motivo
-
-**Validações:**
-- Motivo obrigatório (mín. 10 caracteres)
-- Quantidade >= 0
+#### Extras (não usados pelo front atual)
+- `GET /produtos/{id}` → `Produto`.
+- `GET /produtos/{id}/movimentos?de&ate&tipo` → array de movimentações `{ id, produtoId, tipo, quantidade, estoqueAnterior, estoqueNovo, motivo, referenciaId, usuarioId, data }`.
 
 ---
 
 ### 5.4 Sales Service (Port 8083)
 
-**Base Path:** `/api/vendas`
-
-#### **POST /api/vendas**
-**Função:** Criar nova venda ou orçamento
-
-**Request:**
+#### **POST /vendas**
+**Request** — `VendaInput`:
 ```json
 {
   "tipoDocumento": "nfce",
@@ -1507,684 +1123,250 @@ Authorization: Bearer {token}
   "destinoDinheiro": null,
   "desconto": 0,
   "status": "finalizada",
-  "itens": [
-    {
-      "produtoId": "uuid",
-      "quantidade": 2,
-      "valorUnitario": 89.90
-    }
-  ]
+  "itens": [ { "produtoId": 7, "quantidade": 2, "valorUnitario": 89.9 } ]
 }
 ```
+- `status: "orcamento"` salva o orçamento e reserva o estoque (a reserva é liberada se o orçamento for cancelado). `"finalizada"` também reserva e dispara a emissão do documento fiscal.
 
-**Response (201 Created):**
+**Response (201 Created)** — `Venda`:
 ```json
 {
-  "id": "uuid",
-  "numero": "VD-000126",
+  "id": 126,
   "tipoDocumento": "nfce",
-  "subtotal": 179.80,
+  "modalidade": "fisica",
+  "clienteId": null,
+  "metodoPagamento": "credito",
+  "bandeira": "visa",
+  "destinoDinheiro": null,
   "desconto": 0,
-  "total": 179.80,
+  "subtotal": 179.8,
+  "total": 179.8,
   "status": "finalizada",
-  "criadaEm": "2024-09-20T15:00:00Z",
-  "itens": [...]
+  "itens": [ { "produtoId": 7, "quantidade": 2, "valorUnitario": 89.9 } ]
 }
 ```
 
 **Validações:**
-- NF-e exige `clienteId`, e o cliente precisa ter endereço completo (`cep`, `logradouro`, `numero`, `bairro`, `cidade`, `uf`); caso contrário `422` com os campos faltantes em `campos`
-- NFC-e permite `clienteId` null
-- Pelo menos 1 item
-- Verificar estoque disponível para cada item
-- Desconto não pode ser maior que subtotal
-- `bandeira` obrigatória se método = crédito/débito
-- `destinoDinheiro` obrigatório se método = dinheiro
+- NF-e exige `clienteId` de um cliente ativo; NFC-e aceita `null`.
+- Pelo menos 1 item; `quantidade` ≥ 1; `valorUnitario` > 0 (o PDV permite editar o preço).
+- `desconto` entre 0 e `subtotal`.
+- `bandeira` obrigatória com `credito`/`debito` e `null` nos demais; `destinoDinheiro` obrigatório com `dinheiro` e `null` nos demais.
+- Estoque disponível para cada item, somando linhas do mesmo produto (chamada síncrona ao product-service).
 
-**Efeitos Colaterais:**
-1. Cria registro em `sales` e `sale_items`
-2. Publica eventos `reserve` na `inventory-updates-queue` (um por item)
-3. Se status = `finalizada`: Publica `sale.created` na `sales-events-queue`
+**Efeitos:** reserva o estoque (`reserve` na `inventory-updates-queue`, um por item). Se `finalizada`, publica `sale.created` no `sales-events-topic`. A emissão é **assíncrona**: a nota aparece em `GET /notas` com `vendaId` = id da venda e `status: "processando"` até a SEFAZ responder.
 
-**Erros:**
-- `400 Bad Request`: Dados inválidos
-- `409 Conflict`: Estoque insuficiente para algum item
-- `422 Unprocessable Entity`: NF-e para cliente sem endereço completo
+**Erros:** `400` dados inválidos ou desconto acima do subtotal · `404` cliente ou produto inexistente · `409` estoque insuficiente (`message` cita o produto).
 
----
-
-#### **GET /api/vendas/{id}**
-**Função:** Detalhes da venda
-
-**Response (200 OK):**
-```json
-{
-  "id": "uuid",
-  "numero": "VD-000126",
-  "tipoDocumento": "nfce",
-  "modalidade": "fisica",
-  "cliente": {
-    "id": "uuid",
-    "nome": "João Silva"
-  },
-  "metodoPagamento": "credito",
-  "bandeira": "visa",
-  "subtotal": 179.80,
-  "desconto": 0,
-  "total": 179.80,
-  "status": "finalizada",
-  "notaFiscalId": "uuid",
-  "vendedorId": "uuid",
-  "criadaEm": "2024-09-20T15:00:00Z",
-  "finalizadaEm": "2024-09-20T15:00:00Z",
-  "itens": [
-    {
-      "itemId": "uuid",
-      "produtoId": "uuid",
-      "codigo": "PF-001",
-      "nome": "Pastilha de Freio",
-      "quantidade": 2,
-      "valorUnitario": 89.90,
-      "valorTotal": 179.80
-    }
-  ]
-}
-```
-
----
-
-#### **GET /api/vendas**
-**Função:** Listar vendas
-
-**Query Parameters:**
-- `status` (opcional): `orcamento|finalizada|cancelada`
-- `clienteId` (opcional)
-- `vendedorId` (opcional)
-- `de` (opcional): Data inicial
-- `ate` (opcional): Data final
-- `limit` (opcional)
-- `lastKey` (opcional): Cursor para paginação
-
-**Response (200 OK):** Envelope padrão (`{items, lastKey, count}`) com vendas no formato resumido (sem `itens`)
-
----
-
-#### **PUT /api/vendas/{id}/status**
-**Função:** Alterar status da venda
-
-**Request:**
-```json
-{
-  "status": "finalizada"
-}
-```
-
-**Transições Permitidas:**
-- `orcamento` → `finalizada`
-- `orcamento` → `cancelada`
-
-**Efeitos Colaterais (orcamento → finalizada):**
-- Publica `sale.created` na `sales-events-queue`
-- Dispara emissão fiscal
-
-**Efeitos Colaterais (cancelada):**
-- Publica eventos `release` na `inventory-updates-queue`
-- Libera estoque reservado
-
----
-
-#### **DELETE /api/vendas/{id}**
-**Função:** Cancelar venda
-
-**Regras:**
-- Apenas vendas com status `orcamento` podem ser canceladas
-- Vendas finalizadas devem usar cancelamento fiscal
-
-**Response (204 No Content)**
+#### Extras (não usados pelo front atual)
+- `GET /vendas?status&clienteId&de&ate` → `Venda[]`.
+- `GET /vendas/{id}` → `Venda` + `notaFiscalId` (extra).
+- `PUT /vendas/{id}/status` com `{ "status": "finalizada" }` finaliza um orçamento.
 
 ---
 
 ### 5.5 Fiscal Service (Port 8084)
 
-**Base Path:** `/api/notas`
-
-#### **GET /api/notas**
-**Função:** Listar notas fiscais
-
-**Query Parameters:**
-- `status` (opcional): `processando|autorizada|rejeitada|cancelada`
-- `tipo` (opcional): `NFE|NFCE|DEVOLUCAO|ENTRADA`
-- `de` (opcional): Data inicial
-- `ate` (opcional): Data final
-- `clienteId` (opcional)
-- `limit` (opcional)
-- `lastKey` (opcional): Cursor para paginação
-
-**Response (200 OK):**
+**Modelo `NotaFiscal`:**
 ```json
 {
-  "items": [
-    {
-      "id": "uuid",
-      "tipo": "NFCE",
-      "numero": "000126",
-      "serie": "1",
-      "chaveAcesso": "35240912345678901234550010001260001234567890",
-      "valorTotal": 179.80,
-      "emitidaEm": "2024-09-20T15:00:00Z",
-      "status": "autorizada",
-      "protocolo": "135240000012345",
-      "cliente": "João Silva"
-    }
-  ],
-  "lastKey": "base64-encoded-key",
-  "count": 20
-}
-```
-
----
-
-#### **GET /api/notas/{id}**
-**Função:** Detalhes da nota fiscal
-
-**Response (200 OK):**
-```json
-{
-  "id": "uuid",
+  "id": 310,
   "tipo": "NFCE",
-  "modelo": "65",
   "numero": "000126",
   "serie": "1",
-  "chaveAcesso": "35240912345678901234550010001260001234567890",
-  "vendaId": "uuid",
+  "chaveAcesso": "35260912345678000190650010001260001234567890",
   "clienteId": null,
-  "valorProdutos": 179.80,
-  "valorDesconto": 0,
-  "valorTotal": 179.80,
-  "valorIcms": 32.36,
-  "emitidaEm": "2024-09-20T15:00:00Z",
-  "autorizadaEm": "2024-09-20T15:01:30Z",
+  "clienteNome": null,
+  "clienteDocumento": null,
+  "fornecedorId": null,
+  "valorTotal": 179.8,
+  "emitidaEm": "2026-09-20T15:00:00Z",
   "status": "autorizada",
-  "protocolo": "135240000012345",
-  "codigoStatus": "100",
-  "ambiente": "producao",
-  "tentativasEnvio": 1,
-  "xmlPath": "s3://wc-documents-bucket/NFCE/2024/09/35240912...xml",
-  "pdfPath": "s3://wc-documents-bucket/NFCE/2024/09/35240912...pdf",
-  "itens": [
-    {
-      "itemId": "uuid",
-      "produtoId": "uuid",
-      "codigo": "PF-001",
-      "descricao": "Pastilha de Freio Dianteira",
-      "ncm": "87083010",
-      "cfop": "5102",
-      "quantidade": 2,
-      "valorUnitario": 89.90,
-      "valorTotal": 179.80,
-      "quantidadeDevolvida": 0
-    }
-  ]
+  "vendaId": 126,
+  "notaReferenciadaId": null
 }
 ```
+- `clienteNome`/`clienteDocumento` são copiados para a nota na emissão (não exigem chamada extra). Em nota de entrada, `fornecedorId` vem preenchido e os campos de cliente ficam `null`.
+- `chaveAcesso` é `null` enquanto a nota não foi gerada.
+- `status`: `processando|autorizada|cancelada` (contrato do front) e `rejeitada` (ver seção 5.10).
 
-**Erros:**
-- `404 Not Found`: Nota não existe
+**Modelo `NotaFiscalItem`:** `{ "produtoId": 7, "codigo": "PF-001", "descricao": "Pastilha de Freio Dianteira", "ncm": "87083010", "cfop": "5102", "quantidade": 2, "valorUnitario": 89.9 }`
 
----
+#### **GET /notas**
+**Query:** `status`, `de`, `ate` (`yyyy-MM-dd`, sobre `emitidaEm`). Extras opcionais: `tipo`, `vendaId`.
 
-#### **GET /api/notas/{id}/itens**
-**Função:** Listar os itens da nota (usado pela tela de devolução)
+**Response (200 OK):** `NotaFiscal[]`, mais recente primeiro. Inclui notas de venda, devolução e entrada.
 
-**Response (200 OK):**
+#### **GET /notas/{id}/itens**
+**Response (200 OK):** `NotaFiscalItem[]`. **Erros:** `404`.
+
+#### **POST /notas/{id}/cancelamento**
+**Request:** `{ "justificativa": "Cliente desistiu da compra após emissão" }`
+
+**Response (200 OK):** `NotaFiscal` com `status: "processando"`. Vira `cancelada` quando a SEFAZ homologa o evento; se a SEFAZ recusar, volta para `autorizada`.
+
+**Validações (feitas no back; a tela não confere o prazo):** nota `autorizada`; até 24h após a autorização; justificativa com ≥ 15 caracteres após `trim`. Exige `ADMIN`.
+
+**Efeitos:** grava em `fiscal_events` (CANCELAMENTO) e publica na `fiscal-events-queue`. Após homologação, devolve o estoque (`increase`).
+
+**Erros:** `400` justificativa curta · `403` · `404` · `409` já existe cancelamento em processamento · `422` nota não autorizada ou prazo de 24h vencido (`message`: "Prazo de cancelamento expirado").
+
+#### **POST /notas/devolucao**
+**Request** — `DevolucaoInput`:
 ```json
 {
-  "items": [
-    {
-      "itemId": "uuid",
-      "produtoId": "uuid",
-      "codigo": "PF-001",
-      "descricao": "Pastilha de Freio Dianteira",
-      "ncm": "87083010",
-      "cfop": "5102",
-      "quantidade": 2,
-      "valorUnitario": 89.90,
-      "valorTotal": 179.80,
-      "quantidadeDevolvida": 0
-    }
-  ],
-  "lastKey": null,
-  "count": 1
-}
-```
-
-- `itemId` identifica o item **nesta nota** e é o valor esperado em `POST /api/notas/devolucao`.
-- `quantidadeDevolvida` soma devoluções já autorizadas; o máximo a devolver é `quantidade - quantidadeDevolvida`.
-
-**Erros:**
-- `404 Not Found`: Nota não existe
-
----
-
-#### **POST /api/notas/{id}/reenviar**
-**Função:** Reenviar nota rejeitada para SEFAZ
-
-**Response (200 OK):**
-```json
-{
-  "message": "Nota reenviada para processamento",
-  "notaId": "uuid"
-}
-```
-
-**Regras:**
-- Apenas notas com status `rejeitada` podem ser reenviadas
-
-**Efeitos Colaterais:**
-- Reseta `tentativasEnvio` para 0
-- Publica novamente na `sefaz-queue`
-
----
-
-#### **POST /api/notas/{id}/cancelamento**
-**Função:** Cancelar nota fiscal autorizada
-
-**Request:**
-```json
-{
-  "justificativa": "Cliente desistiu da compra após emissão"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "eventoId": "uuid",
-  "status": "processando",
-  "message": "Solicitação de cancelamento enviada à SEFAZ"
-}
-```
-
-**Validações:**
-- Nota deve estar `autorizada`
-- Prazo máximo: 24 horas desde autorização
-- Justificativa mínima: 15 caracteres
-
-**Efeitos Colaterais:**
-1. Cria registro em `fiscal_events` (tipo: CANCELAMENTO)
-2. Publica na `fiscal-events-queue`
-3. Listener processa e envia evento para SEFAZ
-4. Após confirmação: Atualiza status para `cancelada`
-5. Publica eventos `increase` na `inventory-updates-queue` (devolve estoque)
-
----
-
-#### **POST /api/notas/inutilizacao**
-**Função:** Inutilizar faixa de numeração
-
-**Request:**
-```json
-{
-  "serie": "1",
-  "numeroInicial": 100,
-  "numeroFinal": 105,
-  "justificativa": "Numeração pulada por erro no sistema"
-}
-```
-
-**Response (201 Created):**
-```json
-{
-  "id": "uuid",
-  "serie": "1",
-  "numeroInicial": 100,
-  "numeroFinal": 105,
-  "quantidade": 6,
-  "status": "processando"
-}
-```
-
-**Validações:**
-- `numeroFinal` >= `numeroInicial`
-- Justificativa mínima: 15 caracteres
-- Não pode haver notas autorizadas na faixa
-
-**Efeitos Colaterais:**
-- Cria registro em `fiscal_events`
-- Publica na `fiscal-events-queue`
-- Envia para SEFAZ
-
----
-
-#### **POST /api/notas/devolucao**
-**Função:** Emitir NF-e de devolução
-
-**Request:**
-```json
-{
-  "notaReferenciadaId": "uuid",
+  "notaReferenciadaId": 310,
   "motivo": "Produto com defeito",
+  "itens": [ { "produtoId": 7, "quantidade": 1, "valorUnitario": 89.9 } ]
+}
+```
+
+**Response (201 Created):** `NotaFiscal` (`tipo: "DEVOLUCAO"`, `status: "processando"`, `notaReferenciadaId` preenchido).
+
+**Validações:**
+- Nota referenciada `autorizada` e de venda (`NFE` ou `NFCE`).
+- Cada `produtoId` precisa estar entre os itens da nota referenciada (não dá para devolver item que não estava na nota).
+- `quantidade` > 0 e ≤ quantidade vendida daquele produto menos o que já foi devolvido em devoluções não rejeitadas.
+- O `valorUnitario` usado é o da nota original; o enviado pelo front é ignorado.
+- `motivo` opcional; vazio vira "Devolução de mercadoria".
+
+**Efeitos:** cria a nota de devolução e segue o fluxo normal de emissão (fila `fiscal-jobs-queue`). Após autorização, devolve o estoque (`increase`).
+
+**Erros:** `400` nenhum item com quantidade · `404` · `422` nota referenciada não autorizada, produto fora da nota ou quantidade acima do saldo.
+
+#### **POST /notas/{id}/reenviar** *(extra)*
+Reenvia uma nota `rejeitada` à SEFAZ. Responde `NotaFiscal` com `status: "processando"`.
+
+---
+
+### 5.6 Inutilização (Fiscal Service, Port 8084)
+
+**Modelo `Inutilizacao`:**
+```json
+{
+  "id": 4,
+  "serie": "1",
+  "numeroInicial": 100,
+  "numeroFinal": 105,
+  "justificativa": "Numeração pulada por erro no sistema",
+  "protocolo": null,
+  "registradaEm": "2026-09-20T15:00:00Z"
+}
+```
+`protocolo` fica `null` até a SEFAZ homologar.
+
+#### **GET /inutilizacoes**
+**Response (200 OK):** `Inutilizacao[]`, mais recente primeiro.
+
+#### **POST /inutilizacoes**
+**Request** — `InutilizacaoInput`: `{ "serie": "1", "numeroInicial": 100, "numeroFinal": 105, "justificativa": "..." }`
+
+**Response (201 Created):** `Inutilizacao`
+
+**Validações:** `numeroFinal` ≥ `numeroInicial`; justificativa ≥ 15 caracteres; nenhuma nota emitida na faixa; faixa não inutilizada antes. Exige `ADMIN`.
+
+**Efeitos:** grava em `fiscal_events` (INUTILIZACAO) e publica na `fiscal-events-queue`; o listener preenche `protocolo` após a homologação.
+
+**Erros:** `400` · `403` · `409` faixa sobrepõe outra inutilização · `422` faixa com nota emitida (a `message` lista os números).
+
+---
+
+### 5.7 Entry Service (Port 8085) — nota de entrada
+
+Os caminhos ficam sob `/notas/entrada` porque é assim que o front chama; o gateway roteia esse prefixo para o entry-service.
+
+**`EntradaInput`:**
+```json
+{
+  "fornecedor": { "cnpj": "12345678000190", "razaoSocial": "Fornecedor ABC LTDA", "ie": "123456789", "uf": "SP" },
+  "numero": "12345",
+  "serie": "1",
+  "dataEmissao": "2026-09-20",
+  "dataEntrada": "2026-09-21",
+  "chaveAcesso": "35260912345678000190550010000123451234567890",
+  "naturezaOperacao": "Compra para comercialização",
   "itens": [
-    {
-      "itemId": "uuid",
-      "quantidadeDevolver": 1
-    }
+    { "produtoId": null, "codigo": "PF-001", "descricao": "Pastilha de Freio", "ncm": "87083010", "cfop": "1102", "quantidade": 100, "valorUnitario": 45.5 }
   ]
 }
 ```
 
-**Response (201 Created):** Nota de devolução criada
+#### **POST /notas/entrada**
+**Response (201 Created):** `NotaFiscal` com `tipo: "ENTRADA"`, `status: "autorizada"` (é nota de terceiro, já autorizada), `fornecedorId` preenchido.
 
-**Validações:**
-- Nota referenciada deve estar `autorizada`
-- `itemId` deve ser um item da nota referenciada (obtido em `GET /api/notas/{id}/itens`)
-- `quantidadeDevolver` <= `quantidade - quantidadeDevolvida` do item
-- Pelo menos 1 item com quantidade > 0
+**Validações:** CNPJ válido; chave de acesso com 44 dígitos e ainda não registrada; `dataEntrada` ≥ `dataEmissao`; pelo menos 1 item; cada item com `produtoId` informado **ou** `codigo` existente no catálogo (decisão A5 do backlog: código desconhecido → `422` listando os códigos em `campos`).
 
-**Efeitos Colaterais:**
-1. Cria nova nota (tipo: DEVOLUCAO)
-2. Dispara processo de emissão fiscal normal
-3. Após autorização: Publica eventos `increase` na `inventory-updates-queue`
+**Efeitos:** grava em `entry_notes`; cria ou atualiza o fornecedor (tabela `suppliers`, chave `cnpj`, id numérico); publica `increase` por item na `inventory-updates-queue`; chama o Fiscal Service (`POST /internal/notas/entrada`, rede interna, decisão A4 do backlog), que grava a nota `ENTRADA` em `notas_fiscais` e devolve a `NotaFiscal` usada como resposta. Assim a entrada aparece em `GET /notas`.
 
----
+**Erros:** `400` · `409` chave já registrada · `422` código de produto desconhecido.
 
-### 5.6 Entry Service (Port 8085)
+#### **POST /notas/entrada/importar-xml**
+**Request:** `multipart/form-data` com o campo **`arquivo`** (XML da NF-e, máx. 5 MB).
 
-**Base Path:** `/api/entrada`
+**Response (200 OK):** `EntradaInput` preenchido a partir do XML, **sem registrar nada**. Os itens já vêm com `produtoId` quando o `codigo` existe no catálogo, senão `null`. `dataEntrada` vem com a data de hoje. O usuário confere na tela e confirma com `POST /notas/entrada`.
 
-#### **POST /api/entrada**
-**Função:** Registrar nota de entrada manualmente
+**Processo:** parse síncrono; não grava no S3, não publica evento, não mexe em estoque.
 
-**Request:**
-```json
-{
-  "fornecedor": {
-    "cnpj": "12345678901234",
-    "razaoSocial": "Fornecedor ABC LTDA",
-    "ie": "123456789",
-    "uf": "SP"
-  },
-  "nota": {
-    "numero": "12345",
-    "serie": "1",
-    "dataEmissao": "2024-09-20",
-    "dataEntrada": "2024-09-21",
-    "chaveAcesso": "35240912345678901234550010001234501234567890",
-    "naturezaOperacao": "Compra para comercialização"
-  },
-  "itens": [
-    {
-      "codigo": "PF-001",
-      "descricao": "Pastilha de Freio",
-      "ncm": "87083010",
-      "quantidade": 100,
-      "valorUnitario": 45.50,
-      "cfop": "1102"
-    }
-  ]
-}
-```
+**Erros:** `400` arquivo não é XML de NF-e · `409` chave já registrada · `413` arquivo acima de 5 MB.
 
-**Response (201 Created):**
-```json
-{
-  "id": "uuid",
-  "status": "registrada",
-  "message": "Entrada registrada com sucesso. Estoque será atualizado."
-}
-```
-
-**Validações:**
-- CNPJ do fornecedor válido
-- Chave de acesso válida (44 dígitos)
-- Data de entrada >= data de emissão
-- Pelo menos 1 item
-
-**Efeitos Colaterais:**
-1. Cria registro em `entry_notes`
-2. Publica eventos `increase` na `inventory-updates-queue` (um por item)
-3. Estoque é atualizado automaticamente
+> A importação assíncrona em lote (`POST /notas/entrada/importar-xml/lote`: upload no S3 + `entry-events-queue` + `XmlProcessorListener`) não é usada pelo front atual e fica como extensão (épico EPB-12). Também são extras `GET /notas/entrada` (array de entradas) e `GET /notas/entrada/{id}`.
 
 ---
 
-#### **POST /api/entrada/importar-xml**
-**Função:** Importar XML de nota fiscal de entrada
+### 5.8 Document Service (Port 8086) — arquivos da nota
 
-**Request:** `multipart/form-data`
-```
-file: arquivo.xml (max 5MB)
-```
+Também ficam sob `/notas` porque o front os chama assim; o gateway roteia estes caminhos específicos para o document-service.
 
-**Response (202 Accepted):**
-```json
-{
-  "uploadId": "uuid",
-  "s3Key": "fornecedor/12345678901234/2024/09/nota.xml",
-  "message": "XML enviado para processamento"
-}
-```
+#### **GET /notas/{id}/xml**
+Bytes do XML (`nfeProc`). `Content-Type: application/xml`, `Content-Disposition: attachment; filename="NFe<chave>.xml"`. **Erros:** `404` nota inexistente ou ainda sem XML.
 
-**Processo:**
-1. Valida XML (formato, tamanho)
-2. Upload para S3 bucket `wc-xml-storage`
-3. Publica evento na `entry-events-queue`
-4. Listener processa assincronamente:
-   - Parse do XML
-   - Extração de dados
-   - Registro automático da entrada
-   - Atualização de estoque
+#### **GET /notas/{id}/pdf**
+Bytes do DANFE (NF-e) ou DANFE NFC-e (cupom). `Content-Type: application/pdf`. Se o PDF ainda não existir no S3, é gerado na hora e salvo. Nota cancelada sai com o carimbo "CANCELADA". Usado também pelo botão "Imprimir Cupom" do PDV. **Erros:** `404` nota inexistente · `422` nota ainda não autorizada (processando ou rejeitada).
 
-**Erros:**
-- `400 Bad Request`: XML inválido
-- `413 Payload Too Large`: Arquivo > 5MB
+#### **POST /notas/lote-contador**
+Sem corpo. **Response:** `204`.
+
+**Processo:** junta os XMLs das notas `autorizada` e `cancelada` do mês corrente ainda não enviadas, gera um ZIP no bucket `wc-reports-bucket` e envia ao e-mail do contador configurado (`CONTADOR_EMAIL`) via Notification Service, com link pré-assinado de 7 dias. Marca as notas como enviadas.
+
+**Erros:** `409` nenhuma nota pendente de envio no mês · `500` falha ao gerar o ZIP.
 
 ---
 
-#### **POST /api/entrada/importar-xml/previa**
-**Função:** Ler o XML e devolver os dados da entrada **sem registrar nada**, para o usuário conferir e confirmar na tela
+### 5.9 Reports Service (Port 8087)
 
-**Request:** `multipart/form-data`
-```
-file: arquivo.xml (max 5MB)
-```
+#### **GET /notas/relatorio**
+**Query:** `status`, `de`, `ate` (os mesmos filtros de `GET /notas`).
 
-**Response (200 OK):** mesmo formato do corpo de `POST /api/entrada`
-```json
-{
-  "fornecedor": { "cnpj": "...", "razaoSocial": "...", "ie": "...", "uf": "SP" },
-  "nota": { "numero": "...", "serie": "...", "dataEmissao": "2024-09-20", "dataEntrada": null, "chaveAcesso": "...", "naturezaOperacao": "..." },
-  "itens": [ { "codigo": "...", "descricao": "...", "ncm": "...", "quantidade": 100, "valorUnitario": 45.50, "cfop": "1102" } ]
-}
-```
+**Response (200 OK):** CSV com as notas filtradas. `Content-Type: text/csv; charset=utf-8`, `Content-Disposition: attachment; filename="notas_<de>_<ate>.csv"`.
 
-**Processo:**
-1. Valida e faz o parse do XML de forma síncrona
-2. Não grava no S3, não publica evento e não altera estoque
-3. O front exibe os dados, o usuário completa/ajusta (ex.: `dataEntrada`) e confirma via `POST /api/entrada`
+Colunas: `Tipo,Numero,Serie,Chave,Cliente,Documento,Valor,Emitida_Em,Status`.
 
-**Erros:**
-- `400 Bad Request`: XML inválido ou não é NF-e
-- `409 Conflict`: Chave de acesso já registrada como entrada
-- `413 Payload Too Large`: Arquivo > 5MB
-
-> `POST /api/entrada/importar-xml` (assíncrono, registro direto) continua disponível para importação em lote sem conferência.
+#### Extras (não usados pelo front atual)
+- `GET /dashboard` → contadores agregados de vendas, estoque, fiscal e clientes (cache 5 min). O front hoje deriva os números das listas e de `/produtos/resumo`.
+- `GET /relatorios/vendas?de&ate` e `GET /relatorios/estoque` → CSV.
 
 ---
 
-#### **GET /api/entrada**
-**Função:** Listar notas de entrada
+### 5.10 Enums do contrato e pontos que dependem do front
 
-**Query Parameters:**
-- `fornecedorCnpj` (opcional)
-- `de` (opcional)
-- `ate` (opcional)
-- `limit` (opcional)
-- `lastKey` (opcional): Cursor para paginação
+| Enum | Valores |
+|---|---|
+| `TipoPessoa` | `PF`, `PJ` |
+| `TipoDocumento` | `nfe`, `nfce` |
+| `Modalidade` | `fisica`, `virtual` |
+| `MetodoPagamento` | `dinheiro`, `credito`, `debito`, `pix`, `boleto` |
+| `BandeiraCartao` | `mastercard`, `visa`, `elo`, `outros` |
+| `DestinoDinheiro` | `banco`, `cofre` |
+| `StatusEstoque` | `ok`, `atencao`, `baixo`, `critico` |
+| `StatusNota` | `processando`, `autorizada`, `cancelada` (+ `rejeitada`, ver abaixo) |
+| `TipoNota` | `NFE`, `NFCE`, `DEVOLUCAO`, `ENTRADA` |
+| `StatusVenda` | `orcamento`, `finalizada` |
+| `Papel` (extra) | `ADMIN`, `VENDEDOR` |
 
-**Response (200 OK):** Envelope padrão (`{items, lastKey, count}`) com entradas no formato resumido (sem `itens`)
+**Pontos que o back não consegue resolver sozinho** (pedem um PR pequeno no repositório do front quando chegar a hora):
 
----
-
-#### **GET /api/entrada/{id}**
-**Função:** Detalhes da entrada
-
-**Response (200 OK):** Dados completos da entrada + itens
-
----
-
-### 5.7 Document Service (Port 8086)
-
-**Base Path:** `/api/documentos`
-
-#### **GET /api/documentos/xml/{notaId}**
-**Função:** Download do XML da nota fiscal
-
-**Response (200 OK):**
-- Content-Type: `application/xml`
-- Content-Disposition: `attachment; filename="NFe35240912...xml"`
-- Body: Conteúdo do XML
-
-**Processo:**
-1. Busca `xmlPath` na tabela `notas_fiscais`
-2. Gera presigned URL do S3 (expire: 1h)
-3. Retorna XML ou redirect para S3
-
----
-
-#### **GET /api/documentos/pdf/{notaId}**
-**Função:** Download do PDF (DANFE) da nota
-
-**Response (200 OK):**
-- Content-Type: `application/pdf`
-- Content-Disposition: `attachment; filename="DANFE_000126.pdf"`
-
-**Processo:**
-1. Verifica se PDF já existe no S3
-2. Se não: Gera PDF (DANFE) e salva no S3
-3. Retorna presigned URL ou redirect
-
----
-
-#### **POST /api/documentos/lote-contador**
-**Função:** Gerar lote de XMLs para envio ao contador
-
-**Request:**
-```json
-{
-  "notaIds": ["uuid1", "uuid2", "uuid3"],
-  "emailContador": "contador@exemplo.com.br"
-}
-```
-
-**Response (200 OK):**
-```json
-{
-  "loteId": "uuid",
-  "arquivos": 25,
-  "tamanho": "2.5 MB",
-  "downloadUrl": "https://s3.../lote-2024-09-20.zip",
-  "expiresIn": 3600
-}
-```
-
-**Processo:**
-1. Busca XMLs autorizados no S3
-2. Cria arquivo ZIP
-3. Salva no bucket `wc-reports-bucket`
-4. Envia email com link (via Notification Service)
-5. Retorna presigned URL (expire: 1h)
-
----
-
-### 5.8 Reports Service (Port 8087)
-
-**Base Path:** `/api/dashboard` e `/api/relatorios`
-
-#### **GET /api/dashboard**
-**Função:** Dados agregados para dashboard
-
-**Response (200 OK):**
-```json
-{
-  "vendas": {
-    "hoje": 15,
-    "valorHoje": 12500.00,
-    "mes": 450,
-    "valorMes": 250000.00,
-    "ticketMedio": 833.33
-  },
-  "estoque": {
-    "totalProdutos": 847,
-    "produtosBaixo": 23,
-    "produtosCriticos": 8,
-    "valorTotalEstoque": 145890.00
-  },
-  "fiscal": {
-    "emitidasHoje": 12,
-    "autorizadas": 10,
-    "processando": 2,
-    "rejeitadas": 0,
-    "valorHoje": 15000.00
-  },
-  "clientes": {
-    "total": 320,
-    "ativos": 305,
-    "novosNoMes": 12
-  }
-}
-```
-
-**Cache:** Redis 5 minutos
-
-**Queries Executadas:**
-- Vendas do dia/mês (GSI `data-index`)
-- Produtos com estoque baixo (GSI `status-index`)
-- Notas do dia (GSI `emitidaEm-index`)
-- Clientes ativos (GSI `status-index`)
-
----
-
-#### **GET /api/relatorios/vendas**
-**Função:** Relatório de vendas em CSV/Excel
-
-**Query Parameters:**
-- `de` (obrigatório): Data inicial
-- `ate` (obrigatório): Data final
-- `formato` (opcional): `csv` ou `xlsx` (default: csv)
-- `clienteId` (opcional)
-- `vendedorId` (opcional)
-
-**Response (200 OK):**
-- Content-Type: `text/csv` ou `application/vnd.ms-excel`
-- Content-Disposition: `attachment; filename="vendas_2024-09.csv"`
-
-**Colunas CSV:**
-```
-Numero,Data,Cliente,Tipo_Documento,Metodo_Pagamento,Subtotal,Desconto,Total,Nota_Fiscal,Status
-VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
-...
-```
-
----
-
-#### **GET /api/relatorios/estoque**
-**Função:** Relatório de estoque atual
-
-**Response (200 OK):** CSV com todos produtos e situação do estoque
-
----
-
-#### **GET /api/relatorios/fiscal**
-**Função:** Relatório de notas fiscais
-
-**Query Parameters:**
-- `de` (obrigatório)
-- `ate` (obrigatório)
-- `tipo` (opcional)
-- `status` (opcional)
-- `formato` (opcional)
-
-**Response (200 OK):** CSV com notas do período
+1. **Nota rejeitada pela SEFAZ.** O back precisa do status `rejeitada`; o tipo `StatusNota` do front ainda não o tem. Até lá, a tela mostra o texto cru. Proposta: acrescentar `"rejeitada"` ao tipo e um botão "Reenviar" (`POST /notas/{id}/reenviar`).
+2. **Endereço do destinatário na NF-e.** O cadastro do front só tem `cidade` e `uf`. O simulador da SEFAZ aceita assim; uma emissão real de NF-e exige logradouro, número, bairro e CEP do destinatário.
+3. **Guard por papel (H13 do front).** O back já devolve `papel` e responde `403`; falta o front usar.
 
 ---
 
@@ -2209,10 +1391,10 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "eventType": "customer.created | customer.updated | customer.deactivated",
-  "customerId": "uuid",
+  "customerId": 42,
   "timestamp": "2024-09-20T15:00:00Z",
   "data": {
-    "id": "uuid",
+    "id": 42,
     "nome": "João Silva",
     "email": "joao@email.com",
     "documento": "12345678901"
@@ -2251,12 +1433,12 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "type": "reserve | release | decrease | increase | adjust",
-  "produtoId": "uuid",
+  "produtoId": 42,
   "quantidade": 100,
-  "referenciaId": "uuid",
+  "referenciaId": 42,
   "referenciaType": "sale | entry | adjustment",
   "timestamp": "2024-09-20T15:00:00Z",
-  "usuarioId": "uuid",
+  "usuarioId": 42,
   "motivo": "string (apenas para adjust)"
 }
 ```
@@ -2304,9 +1486,9 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "eventType": "sale.created | sale.completed",
-  "saleId": "uuid",
+  "saleId": 42,
   "tipoDocumento": "nfe | nfce",
-  "clienteId": "uuid (nullable)",
+  "clienteId": null,
   "valorTotal": 179.80,
   "timestamp": "2024-09-20T15:00:00Z"
 }
@@ -2341,7 +1523,7 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "jobType": "generate_xml",
-  "notaId": "uuid",
+  "notaId": 42,
   "tipoNota": "NFE | NFCE | DEVOLUCAO",
   "timestamp": "2024-09-20T15:00:00Z"
 }
@@ -2382,7 +1564,7 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 **Formato de Mensagem:**
 ```json
 {
-  "notaId": "uuid",
+  "notaId": 42,
   "xmlPath": "s3://wc-documents-bucket/NFE/2024/09/35240912...xml",
   "ambiente": "producao | homologacao",
   "tipoNota": "NFE | NFCE",
@@ -2439,8 +1621,8 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "eventType": "cancelamento | inutilizacao",
-  "eventoId": "uuid",
-  "notaId": "uuid (para cancelamento)",
+  "eventoId": 42,
+  "notaId": 42,
   "chaveAcesso": "44 dígitos",
   "justificativa": "string",
   "serie": "1 (para inutilização)",
@@ -2487,7 +1669,7 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "eventType": "entry.uploaded",
-  "entryId": "uuid",
+  "entryId": 42,
   "s3Key": "fornecedor/12345678901234/2024/09/nota.xml",
   "timestamp": "2024-09-20T14:00:00Z"
 }
@@ -2615,7 +1797,7 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "MessageType": "low_stock_alert",
-  "produtoId": "uuid",
+  "produtoId": 42,
   "codigo": "PF-001",
   "nome": "Pastilha de Freio Dianteira",
   "estoqueAtual": 5,
@@ -2651,12 +1833,12 @@ VD-000126,2024-09-20,João Silva,NFCE,Crédito,179.80,0,179.80,000126,Finalizada
 ```json
 {
   "MessageType": "sale_completed",
-  "vendaId": "uuid",
+  "vendaId": 42,
   "numero": "VD-000126",
   "clienteNome": "João Silva",
   "clienteEmail": "joao@email.com",
   "valorTotal": 179.80,
-  "notaFiscalId": "uuid",
+  "notaFiscalId": 42,
   "timestamp": "2024-09-20T15:00:00Z"
 }
 ```
