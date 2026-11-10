@@ -45,6 +45,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import br.com.wcautopecas.fiscal.xml.CertificadoA1;
+import br.com.wcautopecas.fiscal.xml.ChaveAcesso;
+import br.com.wcautopecas.fiscal.xml.CertificadosTeste;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -61,6 +66,7 @@ class FiscalIT {
     static void props(DynamicPropertyRegistry r) {
         InfraTeste.registrar(r);
         r.add("wc.fiscal.serie", () -> SERIE);
+        r.add("wc.fiscal.visibilidade-jobs", () -> "2");
     }
 
     @Autowired
@@ -75,6 +81,12 @@ class FiscalIT {
     ObjectMapper mapper;
     @Autowired
     NotaRepository repo;
+    @Autowired
+    S3Client s3;
+    @Autowired
+    SecretsManagerClient secrets;
+    @Autowired
+    CertificadoA1 certificado;
     @MockBean
     Integracoes integracoes;
 
@@ -91,7 +103,8 @@ class FiscalIT {
         });
         given(integracoes.cliente(anyLong())).willAnswer(inv -> {
             long id = inv.getArgument(0);
-            return new Cliente(id, "Cliente " + id, "52998224725", id == 99 ? "RJ" : "SP", "c@teste.com", true);
+            return new Cliente(id, "Cliente " + id, "52998224725", id == 99 ? "Rio de Janeiro" : "São Paulo",
+                    id == 99 ? "RJ" : "SP", "c@teste.com", true);
         });
     }
 
@@ -109,7 +122,7 @@ class FiscalIT {
 
     long venda(String tipoDocumento, Long clienteId) {
         long id = VENDAS.incrementAndGet();
-        given(integracoes.venda(id)).willReturn(new Venda(id, tipoDocumento, clienteId, new BigDecimal("10.00"),
+        given(integracoes.venda(id)).willReturn(new Venda(id, tipoDocumento, "fisica", clienteId, "credito", "visa", new BigDecimal("10.00"),
                 new BigDecimal("189.80"), new BigDecimal("179.80"), "finalizada",
                 List.of(new ItemVenda(7, 2, new BigDecimal("89.90")), new ItemVenda(8, 1, new BigDecimal("10.00"))),
                 null));
@@ -166,12 +179,17 @@ class FiscalIT {
         n.setModelo("NFCE".equals(tipo) ? "65" : "55");
         n.setSerie(SERIE);
         n.setNumero(String.format("%06d", vendaId % 1_000_000));
-        n.setChaveAcesso("3526" + String.format("%040d", vendaId));
+        n.setChaveAcesso(ChaveAcesso.gerar("35", "2611", "12345678000195", n.getModelo(), SERIE,
+                Long.parseLong(n.getNumero()), "1").valor());
         n.setStatus("autorizada");
         n.setVendaId(vendaId);
         n.setClienteId(5L);
         n.setClienteNome("Cliente 5");
         n.setClienteUf("SP");
+        n.setClienteDocumento("52998224725");
+        n.setClienteCidade("São Paulo");
+        n.setMetodoPagamento("pix");
+        n.setModalidade("fisica");
         n.setValorProdutos(new BigDecimal("189.80"));
         n.setValorDesconto(new BigDecimal("10.00"));
         n.setValorTotal(new BigDecimal("179.80"));
@@ -215,7 +233,6 @@ class FiscalIT {
         assertThat(n.get("status").asText()).isEqualTo("processando");
         assertThat(n.get("numero").asText()).matches("\\d{6}");
         assertThat(n.get("serie").asText()).isEqualTo(SERIE);
-        assertThat(n.get("chaveAcesso").isNull()).isTrue();
         assertThat(n.get("clienteNome").isNull()).isTrue();
         assertThat(n.get("valorTotal").decimalValue()).isEqualByComparingTo("179.80");
         long notaId = n.get("id").asLong();
@@ -227,10 +244,18 @@ class FiscalIT {
         assertThat(itens.get(0).get("cfop").asText()).isEqualTo("5102");
 
         verify(integracoes, atLeastOnce()).vincularNota(eq(vendaId), eq(notaId));
-        // a mensagem repetida pode republicar o job (nota ainda sem XML); o processador de XML é idempotente
-        await().atMost(Duration.ofSeconds(20)).untilAsserted(() -> assertThat(mensagens("fiscal-jobs-queue"))
-                .anyMatch(m -> m.path("notaId").asLong() == notaId && "generate_xml".equals(m.path("jobType").asText())
-                        && "NFCE".equals(m.path("tipoNota").asText())));
+        // o job generate_xml é consumido pelo FiscalProcessorListener: XML no S3 e mensagem na sefaz-queue
+        JsonNode envio = esperar("sefaz-queue", 1, m -> m.path("notaId").asLong() == notaId).get(0);
+        assertThat(envio.get("tipoNota").asText()).isEqualTo("NFCE");
+        assertThat(envio.get("tentativa").asInt()).isEqualTo(1);
+        NotaItem gravada = repo.porId(notaId).orElseThrow();
+        assertThat(gravada.getChaveAcesso()).hasSize(44).contains("65" + String.format("%03d", Integer.parseInt(SERIE)));
+        String caminho = gravada.getXmlPath().replace("s3://wc-documents-bucket/", "");
+        assertThat(caminho).startsWith("NFCE/").endsWith(gravada.getChaveAcesso() + ".xml");
+        String xml = s3.getObjectAsBytes(r -> r.bucket("wc-documents-bucket").key(caminho)).asUtf8String();
+        assertThat(xml).contains("<Signature").contains("<qrCode>");
+        assertThat(chamar(HttpMethod.GET, "/api/notas/" + notaId, null, vendedor).getBody().get("chaveAcesso").asText())
+                .isEqualTo(gravada.getChaveAcesso());
     }
 
     @Test
@@ -312,7 +337,7 @@ class FiscalIT {
         assertThat(dev.get("valorTotal").decimalValue()).isEqualByComparingTo("179.80"); // 2 × 89,90 da original
         var itens = chamar(HttpMethod.GET, "/api/notas/" + dev.get("id").asLong() + "/itens", null, vendedor).getBody();
         assertThat(itens.get(0).get("cfop").asText()).isEqualTo("1202");
-        esperar("fiscal-jobs-queue", 1, m -> m.path("notaId").asLong() == dev.get("id").asLong());
+        esperar("sefaz-queue", 1, m -> m.path("notaId").asLong() == dev.get("id").asLong());
 
         // vendidas 3 do produto 7 (duas linhas), 2 em devolução: sobra 1
         r = chamar(HttpMethod.POST, "/api/notas/devolucao", Map.of("notaReferenciadaId", original.getId(),
@@ -384,6 +409,56 @@ class FiscalIT {
         var r = chamar(HttpMethod.POST, "/api/notas/" + n.getId() + "/reenviar", null, vendedor);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody().get("status").asText()).isEqualTo("processando");
-        esperar("fiscal-jobs-queue", 1, m -> m.path("notaId").asLong() == n.getId());
+        esperar("sefaz-queue", 1, m -> m.path("notaId").asLong() == n.getId());
+    }
+
+    void enviarJob(long notaId) throws Exception {
+        String url = sqs.getQueueUrl(r -> r.queueName("fiscal-jobs-queue")).queueUrl();
+        String corpo = mapper.writeValueAsString(Map.of("jobType", "generate_xml", "notaId", notaId, "tipoNota", "NFCE"));
+        sqs.sendMessage(r -> r.queueUrl(url).messageBody(corpo));
+    }
+
+    NotaItem notaProcessando(String ncm) {
+        NotaItem n = notaAutorizada("NFCE", Instant.now());
+        n.setStatus("processando");
+        n.setChaveAcesso(null);
+        n.setAutorizadaEm(null);
+        repo.salvarSeStatus(n, "autorizada");
+        NotaLinha l = linha(n.getId(), 1, 7, 2, "89.90");
+        l.setNcm(ncm);
+        repo.salvarLinha(l);
+        return n;
+    }
+
+    @Test
+    void ncmInvalidoRejeitaNoXsd() throws Exception {
+        NotaItem n = notaProcessando("8708301");
+        enviarJob(n.getId());
+        await().atMost(Duration.ofSeconds(20)).untilAsserted(() ->
+                assertThat(repo.porId(n.getId()).orElseThrow().getStatus()).isEqualTo("rejeitada"));
+        NotaItem r = repo.porId(n.getId()).orElseThrow();
+        assertThat(r.getCodigoStatus()).isEqualTo("XSD");
+        assertThat(r.getMotivoRejeicao()).contains("8708301");
+        assertThat(mensagens("sefaz-queue")).noneMatch(m -> m.path("notaId").asLong() == n.getId());
+    }
+
+    @Test
+    void certificadoVencidoVaiParaDlqComAvisoCritico() throws Exception {
+        String original = secrets.getSecretValue(r -> r.secretId("wc-sefaz-certificate")).secretString();
+        secrets.putSecretValue(r -> r.secretId("wc-sefaz-certificate").secretString(CertificadosTeste.secret(true)));
+        certificado.esquecer();
+        try {
+            NotaItem n = notaProcessando("87083010");
+            enviarJob(n.getId());
+            await().atMost(Duration.ofSeconds(60)).untilAsserted(() -> assertThat(mensagens("fiscal-dlq"))
+                    .anyMatch(m -> m.path("notaId").asLong() == n.getId()));
+            assertThat(mensagens("email-queue")).anyMatch(m -> "fiscal-error".equals(m.path("MessageType").asText())
+                    && "critical".equals(m.path("severity").asText())
+                    && m.path("message").asText().contains("Nota " + n.getId()));
+            assertThat(repo.porId(n.getId()).orElseThrow().getStatus()).isEqualTo("processando");
+        } finally {
+            secrets.putSecretValue(r -> r.secretId("wc-sefaz-certificate").secretString(original));
+            certificado.esquecer();
+        }
     }
 }

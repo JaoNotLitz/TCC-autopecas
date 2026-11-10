@@ -6,14 +6,15 @@ import java.util.List;
 /** Chamadas síncronas a sales, customer e product (decisão A4). */
 public interface Integracoes {
 
-    record Venda(long id, String tipoDocumento, Long clienteId, BigDecimal desconto, BigDecimal subtotal,
-            BigDecimal total, String status, List<ItemVenda> itens, Long notaFiscalId) {
+    record Venda(long id, String tipoDocumento, String modalidade, Long clienteId, String metodoPagamento,
+            String bandeira, BigDecimal desconto, BigDecimal subtotal, BigDecimal total, String status,
+            List<ItemVenda> itens, Long notaFiscalId) {
     }
 
     record ItemVenda(long produtoId, long quantidade, BigDecimal valorUnitario) {
     }
 
-    record Cliente(long id, String nome, String documento, String uf, String email, boolean ativo) {
+    record Cliente(long id, String nome, String documento, String cidade, String uf, String email, boolean ativo) {
     }
 
     /** Recorte do {@code GET /internal/produtos/{id}}. */
