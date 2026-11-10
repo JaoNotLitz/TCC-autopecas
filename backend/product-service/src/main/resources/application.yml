@@ -1,0 +1,81 @@
+spring:
+  application:
+    name: product-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  jackson:
+    default-property-inclusion: always
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  cloud:
+    aws:
+      endpoint: ${AWS_ENDPOINT_URL:}
+      region:
+        static: ${AWS_REGION:sa-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+
+server:
+  port: ${SERVER_PORT:8082}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+springdoc:
+  api-docs:
+    enabled: false
+
+wc:
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:}
+    region: ${AWS_REGION:sa-east-1}
+    tabela-counters: ${TABLE_COUNTERS:counters}
+  jwt:
+    secret-name: ${SECRET_JWT:wc-jwt-secret}
+  cors:
+    origens: ${FRONT_ORIGIN:http://localhost:5173}
+  seguranca:
+    caminhos-publicos:
+      - /actuator/**
+      - /v3/api-docs/**
+      - /swagger-ui/**
+      - /swagger-ui.html
+  produtos:
+    tabela-produtos: ${TABLE_PRODUCTS:products}
+    tabela-estoque: ${TABLE_INVENTORY:inventory}
+    tabela-movimentos: ${TABLE_INVENTORY_MOVEMENTS:inventory_movements}
+    fila-estoque: ${QUEUE_INVENTORY_UPDATES:inventory-updates-queue}
+    topico-alertas: ${TOPIC_LOW_STOCK:low-stock-alerts-topic}
+    topico-sistema: ${TOPIC_SYSTEM_NOTIFICATIONS:system-notifications-topic}
+    cache-produto: 1h
+    cache-resumo: 5m
+    # Dados fiscais que a tela não tem (seção 5.3): padrões do serviço.
+    fiscal-padrao:
+      cfop: "5102"
+      origem: "0"
+      cst-icms: "00"
+      aliquota-icms: 18
+---
+spring:
+  config:
+    activate:
+      on-profile: local
+springdoc:
+  api-docs:
+    enabled: true
+wc:
+  produtos:
+    seed:
+      habilitado: true

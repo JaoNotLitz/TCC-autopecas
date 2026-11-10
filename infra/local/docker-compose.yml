@@ -72,6 +72,15 @@ services:
       <<: *servico-env
       SERVER_PORT: 8081
 
+  product-service:
+    <<: *servico
+    build: { context: ../../backend, args: { MODULE: product-service } }
+    container_name: wc-product-service
+    ports: ["8082:8082"]
+    environment:
+      <<: *servico-env
+      SERVER_PORT: 8082
+
 networks:
   wc-net:
     name: wc-net

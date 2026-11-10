@@ -23,6 +23,7 @@ A primeira subida leva uns 2 minutos (download das imagens e build do Maven dent
 | `wc-lambda-build` | — | Compila o jar da Lambda `wc-jwt-authorizer` num volume e encerra |
 | `wc-auth-service` | 8080 | Login, `/me`, logout |
 | `wc-customer-service` | 8081 | Clientes (com 10 clientes de exemplo no perfil local) |
+| `wc-product-service` | 8082 | Produtos, estoque e o listener da `inventory-updates-queue` (com 20 produtos de exemplo) |
 
 Os demais serviços entram aqui à medida que os épicos forem entregues.
 
