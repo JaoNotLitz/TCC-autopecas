@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: notification-service
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+  jackson:
+    default-property-inclusion: always
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+  thymeleaf:
+    # os templates de e-mail têm resolvedor próprio (email-templates/); não há páginas web
+    check-template-location: false
+  cloud:
+    aws:
+      endpoint: ${AWS_ENDPOINT_URL:}
+      region:
+        static: ${AWS_REGION:sa-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
+
+server:
+  port: ${SERVER_PORT:8088}
+  shutdown: graceful
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+wc:
+  aws:
+    endpoint: ${AWS_ENDPOINT_URL:}
+    region: ${AWS_REGION:sa-east-1}
+    tabela-counters: ${TABLE_COUNTERS:counters}
+  jwt:
+    secret-name: ${SECRET_JWT:wc-jwt-secret}
+  cors:
+    origens: ${FRONT_ORIGIN:http://localhost:5173}
+  seguranca:
+    caminhos-publicos:
+      - /actuator/**
+  notificacoes:
+    fila-email: ${QUEUE_EMAIL:email-queue}
+    fila-clientes: ${QUEUE_CUSTOMER_EVENTS:customer-events-queue}
+    remetente: ${SES_SENDER:noreply@wcautopecas.com.br}
+    alerta-estoque-destinatarios: ${ALERTA_ESTOQUE_DESTINATARIOS:}
+    ops-destinatarios: ${OPS_DESTINATARIOS:}

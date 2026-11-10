@@ -15,6 +15,7 @@ O contrato da API é o do front React (`dinastiadoge/tcc`): ids numéricos, list
 | `entry-service` | 8085 | EPB-11 | pronto (nota de entrada do fornecedor pelo formulário ou pela prévia do XML; resolve produtos pelo código, grava o fornecedor, vira nota `ENTRADA` no fiscal-service e soma o estoque) |
 | `document-service` | 8086 | EPB-13 | pronto (DANFE em PDF da NF-e em A4 e do cupom NFC-e 80 mm com QR Code, gerado ao autorizar e sob demanda; carimbo "CANCELADA"; download do XML; lote mensal de XMLs em ZIP com link de 7 dias por e-mail ao contador) |
 | `reports-service` | 8087 | EPB-14 | relatório do Painel Fiscal pronto (`GET /api/notas/relatorio`: CSV com as mesmas notas e filtros de `GET /api/notas`, mês corrente por padrão); dashboard e relatórios de vendas/estoque são extras e ficam para o fim |
+| `notification-service` | 8088 | EPB-15 | pronto (sem API pública; consome a `email-queue` e a `customer-events-queue`; templates Thymeleaf `welcome`, `sale-confirmation`, `low-stock-alert`, `fiscal-error` e `contador-lote` enviados pelo SES; alertas de estoque crítico, venda e sistema high/critical viram e-mail) |
 | `wc-jwt-authorizer` | Lambda | EPB-02 | pronto (o gateway e as rotas estão em `infra/local/init/ready.d/50-gateway.sh`) |
 
 ## Rodar
