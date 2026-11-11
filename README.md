@@ -12,3 +12,6 @@ O front React fica em [dinastiadoge/tcc](https://github.com/dinastiadoge/tcc).
 make up      # sobe LocalStack, Redis e os serviços
 make verify  # confere os recursos AWS emulados
 ```
+
+**Só quer rodar, sem compilar?** Use o [`pacote/`](pacote/README.md): um `docker-compose.yml` com imagens
+prontas do GHCR (no Windows, dois cliques em `iniciar.bat`). Cabe num PC de 8 GB.

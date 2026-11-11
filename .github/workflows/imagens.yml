@@ -1,0 +1,93 @@
+name: imagens
+
+# Publica no GHCR as imagens usadas pelo pacote/ (rodar em qualquer PC sem compilar):
+#   ghcr.io/<dono>/wc-servicos, wc-localstack e wc-sefaz-mock, com as tags latest e o sha curto.
+# Antes de publicar, sobe o pacote com as imagens recém-buildadas e roda o smoke e o e2e nele.
+on:
+  pull_request:
+    paths: ["backend/**", "infra/**", "pacote/**", ".github/workflows/imagens.yml"]
+  push:
+    branches: [main]
+    paths: ["backend/**", "infra/**", "pacote/**", ".github/workflows/imagens.yml"]
+  workflow_dispatch:
+
+concurrency:
+  group: imagens-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  ALVOS: servicos localstack sefaz-mock
+
+jobs:
+  pacote:
+    name: smoke do pacote
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Builda as imagens (amd64)
+        run: |
+          dono=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          for alvo in $ALVOS; do
+            docker buildx build -f pacote/Dockerfile --target "$alvo" --load \
+              --cache-from type=gha,scope=pacote --cache-to type=gha,scope=pacote,mode=max \
+              -t "ghcr.io/$dono/wc-$alvo:latest" .
+          done
+      - name: Sobe o pacote sem compilar nada
+        working-directory: pacote
+        env:
+          SEFAZ_ESPERAS_RETENTATIVA: 2s,2s
+        run: docker compose up -d --wait --pull missing
+      - name: Gateway e Lambda Authorizer
+        run: infra/local/smoke-gateway.sh
+      - name: Painel de saúde
+        run: infra/local/status.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: Testes ponta a ponta no pacote (com os limites de memória)
+        working-directory: backend
+        run: mvn -B -Pe2e -pl e2e-tests test
+      - name: Memória de cada container
+        if: always()
+        run: docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}"
+      - name: Logs em caso de falha
+        if: failure()
+        working-directory: pacote
+        run: docker compose logs --tail=200
+      - name: Derruba
+        if: always()
+        working-directory: pacote
+        run: docker compose down -v
+
+  publicar:
+    name: publica no GHCR
+    needs: pacote
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Builda e publica (amd64 e arm64)
+        run: |
+          dono=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          sha=$(git rev-parse --short HEAD)
+          for alvo in $ALVOS; do
+            docker buildx build -f pacote/Dockerfile --target "$alvo" --push \
+              --platform linux/amd64,linux/arm64 \
+              --cache-from type=gha,scope=pacote \
+              --label "org.opencontainers.image.source=https://github.com/${{ github.repository }}" \
+              --label "org.opencontainers.image.description=WC Autopecas - wc-$alvo" \
+              -t "ghcr.io/$dono/wc-$alvo:latest" -t "ghcr.io/$dono/wc-$alvo:$sha" .
+          done

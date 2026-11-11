@@ -1,0 +1,7 @@
+**
+!backend/
+!infra/local/init/
+!infra/local/sefaz-mock/mappings/
+!pacote/servico.sh
+backend/**/target
+backend/**/.idea
