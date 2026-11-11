@@ -37,7 +37,7 @@ jobs:
         working-directory: pacote
         env:
           SEFAZ_ESPERAS_RETENTATIVA: 2s,2s
-        run: docker compose up -d --wait --pull never
+        run: docker compose up -d --wait --pull missing
       - name: Gateway e Lambda Authorizer
         run: infra/local/smoke-gateway.sh
       - name: Painel de saúde
