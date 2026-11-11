@@ -42,6 +42,8 @@ public class AutenticacaoFilter extends OncePerRequestFilter {
         return caminhosPublicos.stream().anyMatch(p -> matcher.match(p, caminho));
     }
 
+    public static final String MDC_USUARIO = "usuarioId";
+
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse resp, FilterChain chain)
             throws ServletException, IOException {
@@ -57,7 +59,13 @@ public class AutenticacaoFilter extends OncePerRequestFilter {
             return;
         }
         req.setAttribute(UsuarioAtual.ATRIBUTO, usuario);
-        chain.doFilter(req, resp);
+        // HU-B16.3: todo log da requisição leva o usuário (o encoder JSON inclui a chave do MDC).
+        org.slf4j.MDC.put(MDC_USUARIO, String.valueOf(usuario.id()));
+        try {
+            chain.doFilter(req, resp);
+        } finally {
+            org.slf4j.MDC.remove(MDC_USUARIO);
+        }
     }
 
     UsuarioAutenticado autenticar(String header) {

@@ -19,6 +19,12 @@ services:
     volumes: [lambdas:/out]
     networks: [wc-net]
 
+  lambda-build-dlq:
+    build: { context: ../../backend, target: lambda, args: { MODULE: wc-dlq-lambdas } }
+    container_name: wc-lambda-build-dlq
+    volumes: [lambdas:/out]
+    networks: [wc-net]
+
   localstack:
     image: localstack/localstack:3.8.1   # última linha da Community sem token de conta
     container_name: wc-localstack
@@ -26,6 +32,8 @@ services:
     env_file: [.env]
     environment:
       SERVICES: dynamodb,sqs,sns,s3,secretsmanager,lambda,apigateway,ses,events,logs,iam,sts
+      # o provider v2 do EventBridge executa as regras agendadas (o v1 do 3.8 não dispara)
+      PROVIDER_OVERRIDE_EVENTS: v2
       LAMBDA_DOCKER_NETWORK: wc-net
       FRONT_ORIGIN: ${FRONT_ORIGIN}
     volumes:
@@ -34,6 +42,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
     depends_on:
       lambda-build: { condition: service_completed_successfully }
+      lambda-build-dlq: { condition: service_completed_successfully }
     healthcheck:
       # Saudável só quando todos os scripts de init terminaram sem erro (ver 99-done.sh).
       test: ["CMD-SHELL", "/etc/localstack/init/healthcheck.sh"]
@@ -45,9 +54,11 @@ services:
   redis:
     image: redis:7.4-alpine
     container_name: wc-redis
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--appendonly", "yes"]
+    # Sem persistência, como o LocalStack Community: se o Redis guardasse as chaves de
+    # idempotência entre subidas, os ids recomeçados no DynamoDB colidiriam com elas e
+    # operações novas de estoque seriam ignoradas como "já aplicadas".
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--save", "", "--appendonly", "no"]
     ports: ["6379:6379"]
-    volumes: [redis-data:/data]
     healthcheck:
       test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
       interval: 5s
@@ -169,10 +180,34 @@ services:
       timeout: 3s
       retries: 20
 
+  # Perfil opcional (HU-B16.3): make observabilidade, ou docker compose --profile observabilidade up.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: wc-prometheus
+    profiles: [observabilidade]
+    ports: ["9090:9090"]
+    volumes: ["./observabilidade/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+    networks: [wc-net]
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    container_name: wc-grafana
+    profiles: [observabilidade]
+    ports: ["3000:3000"]
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/wc-autopecas.json
+    volumes:
+      - ./observabilidade/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observabilidade/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on: [prometheus]
+    networks: [wc-net]
+
 networks:
   wc-net:
     name: wc-net
 
 volumes:
-  redis-data:
   lambdas:

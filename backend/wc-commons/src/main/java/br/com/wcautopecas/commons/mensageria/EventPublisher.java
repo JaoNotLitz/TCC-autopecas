@@ -33,6 +33,9 @@ public class EventPublisher {
         this.mapper = mapper;
     }
 
+    /** Atributo com a fila de destino, lido pelo {@code wc-dlq-redrive}. */
+    public static final String ORIGEM_FILA = "origemFila";
+
     public void enviarFila(String fila, String eventType, Object evento) {
         enviarFila(fila, eventType, evento, Map.of());
     }
@@ -40,7 +43,10 @@ public class EventPublisher {
     public void enviarFila(String fila, String eventType, Object evento, Map<String, String> atributos) {
         String url = filas.computeIfAbsent(fila, n -> sqs.getQueueUrl(r -> r.queueName(n)).queueUrl());
         Map<String, software.amazon.awssdk.services.sqs.model.MessageAttributeValue> attrs = new HashMap<>();
-        atributos(eventType, atributos).forEach((k, v) -> attrs.put(k,
+        Map<String, String> comOrigem = new HashMap<>(atributos);
+        // HU-B16.2: se a mensagem cair na fiscal-dlq, o redrive sabe para onde devolver.
+        comOrigem.putIfAbsent(ORIGEM_FILA, fila);
+        atributos(eventType, comOrigem).forEach((k, v) -> attrs.put(k,
                 software.amazon.awssdk.services.sqs.model.MessageAttributeValue.builder()
                         .dataType("String").stringValue(v).build()));
         sqs.sendMessage(r -> r.queueUrl(url).messageBody(json(evento)).messageAttributes(attrs));

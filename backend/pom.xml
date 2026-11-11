@@ -21,6 +21,7 @@
     <module>wc-commons</module>
     <module>auth-service</module>
     <module>wc-jwt-authorizer</module>
+    <module>wc-dlq-lambdas</module>
     <module>customer-service</module>
     <module>product-service</module>
     <module>sales-service</module>

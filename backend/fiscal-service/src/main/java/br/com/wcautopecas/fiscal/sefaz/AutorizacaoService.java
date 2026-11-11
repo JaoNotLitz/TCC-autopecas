@@ -1,5 +1,6 @@
 package br.com.wcautopecas.fiscal.sefaz;
 
+import br.com.wcautopecas.commons.mensageria.EventPublisher;
 import br.com.wcautopecas.commons.mensageria.Outbox;
 import br.com.wcautopecas.fiscal.FiscalProperties;
 import br.com.wcautopecas.fiscal.nota.NotaItem;
@@ -9,6 +10,7 @@ import br.com.wcautopecas.fiscal.nota.SaldoDevolucao;
 import br.com.wcautopecas.fiscal.sefaz.SefazClient.ComunicacaoException;
 import br.com.wcautopecas.fiscal.sefaz.SefazClient.Resposta;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.micrometer.core.instrument.MeterRegistry;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
@@ -23,6 +25,7 @@ import org.springframework.stereotype.Service;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.MessageAttributeValue;
 
 /**
  * Autorização na SEFAZ (EPB-09): envia o XML assinado, trata 100, 103/105 (consulta do recibo),
@@ -49,7 +52,9 @@ public class AutorizacaoService {
     private final SaldoDevolucao saldo;
 
     public AutorizacaoService(NotaRepository repo, SefazClient sefaz, S3Client s3, SqsClient sqs, Outbox outbox,
-            EfeitosFiscais efeitos, ObjectMapper mapper, FiscalProperties props, Clock clock, SaldoDevolucao saldo) {
+            EfeitosFiscais efeitos, ObjectMapper mapper, FiscalProperties props, Clock clock, SaldoDevolucao saldo,
+            MeterRegistry metricas) {
+        this.metricas = metricas;
         this.saldo = saldo;
         this.repo = repo;
         this.sefaz = sefaz;
@@ -60,6 +65,26 @@ public class AutorizacaoService {
         this.mapper = mapper;
         this.props = props;
         this.clock = clock;
+    }
+
+    private final MeterRegistry metricas;
+
+    /** HU-B16.3: {@code sefaz_retorno_total{cstat}} e {@code wc_notas_total{status}} no /actuator/prometheus. */
+    private void contar(String cStat) {
+        metricas.counter("sefaz_retorno", "cstat", cStat == null ? "?" : cStat).increment();
+    }
+
+    private void contarNota(String status) {
+        metricas.counter("wc_notas", "status", status).increment();
+    }
+
+    /** HU-B16.2: mensagem devolvida pelo redrive recomeça a contagem de tentativas da nota. */
+    public void reiniciarTentativas(long notaId) {
+        repo.porId(notaId).filter(n -> "processando".equals(n.getStatus())).ifPresent(n -> {
+            n.setTentativasEnvio(0);
+            repo.salvarSeStatus(n, "processando");
+            log.info("nota {} voltou da DLQ; tentativas zeradas", notaId);
+        });
     }
 
     public enum Resultado { AUTORIZADA, REJEITADA, REENFILEIRADA, IGNORADA }
@@ -91,15 +116,18 @@ public class AutorizacaoService {
                 }
             }
         } catch (ComunicacaoException e) {
+            contar("erro_comunicacao");
             registrarFalha(n, recebimento, e);
             throw e;
         }
 
         String lote = r.texto("cStat");
         if (!LOTE_PROCESSADO.equals(lote) || r.trecho("protNFe") == null) {
+            contar(lote);
             return rejeitar(n, lote, r.texto("xMotivo"));
         }
         String cStat = r.texto("infProt", "cStat");
+        contar(cStat);
         if (!AUTORIZADA.contains(cStat)) {
             return rejeitar(n, cStat, r.texto("infProt", "xMotivo"));
         }
@@ -135,6 +163,7 @@ public class AutorizacaoService {
             return Resultado.IGNORADA;
         }
         log.info("nota {} {} autorizada, protocolo {}", n.getId(), n.getNumero(), n.getProtocolo());
+        contarNota("autorizada");
 
         List<NotaLinha> linhas = repo.itens(n.getId());
         Map<Long, Long> somas = new LinkedHashMap<>();
@@ -165,6 +194,7 @@ public class AutorizacaoService {
             return Resultado.IGNORADA;
         }
         log.warn("nota {} {} rejeitada pela SEFAZ: {} {}", n.getId(), n.getNumero(), cStat, motivo);
+        contarNota("rejeitada");
         saldo.aplicar(n, SaldoDevolucao.Evento.REJEITADA);
         efeitos.avisar("medium", "Nota " + n.getNumero() + " (id " + n.getId() + ") rejeitada: " + cStat + " " + motivo);
         return Resultado.REJEITADA;
@@ -199,7 +229,10 @@ public class AutorizacaoService {
             String url = sqs.getQueueUrl(r -> r.queueName(props.getFilaSefaz())).queueUrl();
             String corpo = mapper.writeValueAsString(msg);
             int atraso = (int) Math.min(900, props.getSefaz().getAtrasoReenvio().toSeconds());
-            sqs.sendMessage(r -> r.queueUrl(url).messageBody(corpo).delaySeconds(atraso));
+            sqs.sendMessage(r -> r.queueUrl(url).messageBody(corpo).delaySeconds(atraso).messageAttributes(Map.of(
+                    EventPublisher.ORIGEM_FILA, MessageAttributeValue.builder().dataType("String")
+                            .stringValue(props.getFilaSefaz()).build(),
+                    "eventType", MessageAttributeValue.builder().dataType("String").stringValue("send_sefaz").build())));
             log.info("lote da nota {} segue em processamento; nova consulta na tentativa {}", n.getId(), tentativa);
         } catch (Exception e) {
             throw new IllegalStateException("não foi possível devolver a nota " + n.getId() + " para a fila", e);

@@ -39,6 +39,9 @@ public class SefazIntegrationListener {
             Object recebidas = mensagem.getHeaders()
                     .get(SqsHeaders.MessageSystemAttributes.SQS_APPROXIMATE_RECEIVE_COUNT);
             int recebimento = recebidas == null ? 1 : Integer.parseInt(recebidas.toString());
+            if (recebimento == 1 && "true".equals(String.valueOf(mensagem.getHeaders().get("redrive")))) {
+                autorizacao.reiniciarTentativas(m.path("notaId").asLong());
+            }
             try {
                 autorizacao.processar(m.path("notaId").asLong(), m.path("tentativa").asInt(1), recebimento);
             } catch (SefazClient.ComunicacaoException e) {
