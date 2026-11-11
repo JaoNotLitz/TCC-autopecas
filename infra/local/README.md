@@ -6,10 +6,12 @@ Tudo roda na sua máquina, sem conta AWS. Pré-requisitos: Docker com Compose v2
 ```bash
 make up       # copia .env.example para .env (se faltar), builda e sobe tudo, esperando ficar healthy
 make verify   # confere tabelas, filas, tópicos, buckets e secrets no LocalStack
-make status   # containers e saúde
+make status   # saúde de cada serviço, tamanho das filas e da DLQ, Lambdas (sai com 1 se algo caiu)
 make logs     # logs de todos os containers
-make down     # derruba (mantém o volume do Redis)
+make down     # derruba (LocalStack e Redis voltam zerados no próximo up)
 make reset    # derruba e apaga volumes
+make redrive  # lista as mensagens da fiscal-dlq (veja "Operação")
+make observabilidade  # Prometheus (:9090) e Grafana (:3000) com o painel da loja
 ```
 
 A primeira subida leva uns 2 minutos (download das imagens e build do Maven dentro do Docker).
@@ -20,14 +22,18 @@ A primeira subida leva uns 2 minutos (download das imagens e build do Maven dent
 |---|---|---|
 | `wc-localstack` | 4566 | DynamoDB, SQS, SNS, S3, Secrets Manager, SES, Lambda, API Gateway (Community 3.8.1) |
 | `wc-redis` | 6379 | Sessões, contadores de login, cache e locks (senha em `REDIS_PASSWORD`) |
-| `wc-lambda-build` | — | Compila o jar da Lambda `wc-jwt-authorizer` num volume e encerra |
+| `wc-lambda-build`, `wc-lambda-build-dlq` | — | Compilam os jars das Lambdas (`wc-jwt-authorizer` e `wc-dlq-lambdas`) num volume e encerram |
 | `wc-auth-service` | 8080 | Login, `/me`, logout |
 | `wc-customer-service` | 8081 | Clientes (com 10 clientes de exemplo no perfil local) |
 | `wc-product-service` | 8082 | Produtos, estoque e o listener da `inventory-updates-queue` (com 20 produtos de exemplo) |
 | `wc-sales-service` | 8083 | Vendas e orçamentos; chama customer e product pelas rotas internas e publica reserva, `sale.created` e `sale_completed` |
 | `wc-fiscal-service` | 8084 | Notas fiscais: cria a nota de cada venda finalizada, consulta, cancelamento, inutilização e devolução |
-
-Os demais serviços entram aqui à medida que os épicos forem entregues.
+| `wc-entry-service` | 8085 | Notas de entrada do fornecedor (formulário e prévia do XML) |
+| `wc-document-service` | 8086 | DANFE em PDF, download do XML e lote de XMLs do contador |
+| `wc-reports-service` | 8087 | CSV do Painel Fiscal |
+| `wc-notification-service` | 8088 | E-mails por template no SES local (sem API pública) |
+| `wc-sefaz-mock` | 8089 | Simulador da SEFAZ (WireMock) |
+| `wc-prometheus`, `wc-grafana` | 9090, 3000 | Só com `make observabilidade` (perfil opcional) |
 
 ## Recursos criados
 
@@ -47,6 +53,19 @@ serviços também recebem como variáveis de ambiente.
 - `45-certificado.sh`: certificado A1 **autoassinado de teste** (OpenSSL, 365 dias) em `wc-sefaz-certificate` como `{"pfx": base64, "senha": ...}`. Só serve para o simulador da SEFAZ; os testes geram a versão vencida com o `keytool`.
 - `50-gateway.sh`: a Lambda `wc-jwt-authorizer` e a API REST `wc-autopecas-api` (id fixo `wcapi`, stage `local`),
   com as rotas da seção 3.2, respostas de erro do gateway no formato da seção 5.0 e o usage plan.
+- `60-dlq-lambdas.sh`: as Lambdas `wc-dlq-monitor` e `wc-dlq-redrive` e a regra do EventBridge que chama o monitor a cada minuto.
+
+## Operação
+
+- **`make status`**: health de cada serviço, simulador da SEFAZ, gateway, mensagens em cada fila (visíveis / em processamento), DLQ e Lambdas. Bom para conferir a stack antes de apresentar; o CI roda depois do smoke.
+- **Alerta da DLQ**: a `wc-dlq-monitor` roda a cada minuto. Com mais de 5 mensagens na `fiscal-dlq` (`DLQ_LIMITE` no `.env`), publica um alerta `high` no `system-notifications-topic`, que vira e-mail para `OPS_DESTINATARIOS` com uma amostra das origens. Alerta uma vez por faixa (6-10, 11-15...), não a cada minuto.
+- **`make redrive`**: lista o que está na DLQ, com a fila de origem de cada mensagem (atributo `origemFila` que o `wc-commons` põe em todo envio, ou o formato do corpo). Para devolver depois de corrigir a causa:
+  ```bash
+  make redrive ARGS='{"origem":"sefaz-queue","max":10,"dryRun":false}'
+  ```
+  As mensagens voltam com `redrive=true`; a nota recomeça a contagem de tentativas da SEFAZ.
+- **Métricas**: todo serviço expõe `/actuator/prometheus` (ex.: `curl localhost:8084/actuator/prometheus | grep sefaz_retorno`). Além das do Spring (HTTP, JVM), há `sefaz_retorno_total{cstat}`, `wc_notas_total{status}`, `wc_mensagens_total{fila,resultado}` e `wc_listener_seconds{fila}`. Com `make observabilidade`, o Grafana em http://localhost:3000 abre direto no painel "WC Autopeças - operação" (sem login para ver; admin/admin para editar).
+- **Logs**: JSON com `@timestamp`, `level`, `servico`, `correlationId`, `usuarioId` (nas requisições autenticadas), `message` e `stack_trace`. O mesmo `correlationId` atravessa HTTP e filas.
 
 O container do LocalStack só fica `healthy` quando todos esses scripts terminam sem erro (`init/healthcheck.sh`).
 
@@ -98,6 +117,7 @@ curl -s -X POST localhost:8080/api/auth/login -H 'Content-Type: application/json
 | Lambda Authorizer no gateway | O LocalStack Community cria o authorizer mas **não o executa** (é recurso do Pro). A Lambda roda de verdade no LocalStack e é testada chamando-a direto (`smoke-gateway.sh`); quem barra token inválido localmente é o filtro JWT + sessão de cada serviço, que já existiria de qualquer forma |
 | Respostas chunked | O provider do API Gateway que roda na Community perde o corpo de respostas `Transfer-Encoding: chunked`; o `wc-commons` responde com `Content-Length` (`ContentLengthFilter`) |
 | Throttling (usage plan) | Criado, mas a Community não aplica |
-| Persistência do LocalStack | A Community não persiste: a cada `make up` os recursos são recriados pelo init e o seed roda de novo. Por isso o `wc-jwt-secret` muda a cada subida e os tokens antigos deixam de valer |
+| Persistência do LocalStack | A Community não persiste: a cada `make up` os recursos são recriados pelo init e o seed roda de novo. Por isso o `wc-jwt-secret` muda a cada subida e os tokens antigos deixam de valer. O Redis também sobe zerado, para as chaves de idempotência não sobreviverem aos dados |
+| CloudWatch Alarm da DLQ (seção 6.9) | Lambda `wc-dlq-monitor` agendada pelo EventBridge (provider `v2`, o único que dispara regras agendadas na 3.8) |
 
 A imagem do LocalStack está fixa em `3.8.1`: as versões mais novas exigem token de conta da LocalStack.

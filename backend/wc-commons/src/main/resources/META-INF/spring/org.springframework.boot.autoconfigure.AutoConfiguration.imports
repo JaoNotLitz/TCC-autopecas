@@ -3,3 +3,4 @@ br.com.wcautopecas.commons.dynamo.DynamoConfig
 br.com.wcautopecas.commons.seguranca.SegurancaConfig
 br.com.wcautopecas.commons.mensageria.MensageriaConfig
 br.com.wcautopecas.commons.web.WebConfig
+br.com.wcautopecas.commons.metricas.MetricasFilasConfig

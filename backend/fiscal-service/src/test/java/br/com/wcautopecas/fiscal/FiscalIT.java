@@ -56,6 +56,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@org.springframework.boot.test.autoconfigure.actuate.observability.AutoConfigureObservability(tracing = false)
 class FiscalIT {
 
     static final Map<String, List<JsonNode>> LIDAS = new ConcurrentHashMap<>();
@@ -579,6 +580,13 @@ class FiscalIT {
         assertThat(r.getMotivoRejeicao()).contains("Duplicidade");
         assertThat(mensagens("inventory-updates-queue")).noneMatch(m -> m.path("referenciaId").asLong() == n.getVendaId());
         // aviso "medium" não vai para o email-queue (o filtro da assinatura só passa high/critical)
+
+        // HU-B16.3: retorno da SEFAZ por cStat e mensagens por fila no /actuator/prometheus
+        String prometheus = http.getForObject("/actuator/prometheus", String.class);
+        assertThat(prometheus).contains("sefaz_retorno_total{cstat=\"204\"")
+                .contains("wc_notas_total{status=\"rejeitada\"")
+                .contains("wc_mensagens_total{fila=\"sefaz-queue\",resultado=\"ok\"")
+                .contains("wc_listener_seconds_count{fila=\"fiscal-jobs-queue\"");
     }
 
     @Test
