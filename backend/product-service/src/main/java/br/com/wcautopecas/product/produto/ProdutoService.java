@@ -101,6 +101,21 @@ public class ProdutoService {
         });
     }
 
+    /** EPB-14: produtos ativos com estoque, reservado e valores, em ordem alfabética. */
+    public List<Internos.PosicaoEstoque> posicaoEstoque() {
+        Map<Long, EstoqueItem> est = repo.todoEstoque().stream()
+                .collect(Collectors.toMap(EstoqueItem::getProdutoId, Function.identity()));
+        return ativos().values().stream().map(p -> {
+            EstoqueItem e = est.get(p.getId());
+            long atual = e == null ? 0 : nz(e.getEstoqueAtual());
+            long reservado = e == null ? 0 : nz(e.getReservado());
+            long minimo = e == null ? 0 : nz(e.getEstoqueMinimo());
+            String status = e == null || e.getStatus() == null ? StatusEstoque.CRITICO : e.getStatus();
+            return new Internos.PosicaoEstoque(p.getId(), p.getCodigo(), p.getNome(), p.getNcm(), atual, reservado,
+                    atual - reservado, minimo, status, p.getPrecoCusto(), p.getPrecoVenda());
+        }).sorted(Comparator.comparing(Internos.PosicaoEstoque::nome, ALFABETICA)).toList();
+    }
+
     public ResumoEstoque resumo() {
         return cache.resumo(() -> {
             Map<Long, ProdutoItem> produtos = ativos();

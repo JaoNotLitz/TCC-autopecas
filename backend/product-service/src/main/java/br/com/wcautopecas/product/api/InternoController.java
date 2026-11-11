@@ -27,6 +27,12 @@ public class InternoController {
         this.service = service;
     }
 
+    /** EPB-14: posição do estoque para o relatório e o dashboard. */
+    @GetMapping("/estoque")
+    public List<Internos.PosicaoEstoque> estoque() {
+        return service.posicaoEstoque();
+    }
+
     @GetMapping("/{id}")
     public ProdutoFiscal fiscal(@PathVariable long id) {
         return service.fiscal(id);

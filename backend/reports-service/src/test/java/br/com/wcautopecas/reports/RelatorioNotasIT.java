@@ -36,25 +36,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class RelatorioNotasIT {
-
-    @DynamicPropertySource
-    static void props(DynamicPropertyRegistry r) {
-        InfraTeste.registrar(r);
-    }
-
-    @Autowired
-    TestRestTemplate http;
-    @Autowired
-    JwtService jwt;
-    @Autowired
-    SessaoStore sessoes;
-    @MockBean
-    NotasFiscais fiscal;
-
-    String token;
+class RelatorioNotasIT extends BaseIT {
 
     static final NotaResumo AUTORIZADA = new NotaResumo(1, "NFE", "000123", "1",
             "35261112345678000195550010000001231123456789", "Auto Peças Silva, Filial \"Centro\"", "12345678000195",
@@ -65,15 +47,7 @@ class RelatorioNotasIT {
 
     @BeforeEach
     void preparar() {
-        var t = jwt.emitir(2, Papel.VENDEDOR);
-        sessoes.criar(2, t.token(), Duration.ofMinutes(10));
-        token = t.token();
-    }
-
-    <T> ResponseEntity<T> get(String url, Class<T> tipo) {
-        HttpHeaders h = new HttpHeaders();
-        h.setBearerAuth(token);
-        return http.exchange(url, HttpMethod.GET, new HttpEntity<>(h), tipo);
+        token = login(2, Papel.VENDEDOR);
     }
 
     @Test
