@@ -15,4 +15,6 @@ public class ItemEntrada {
     private String cfop;
     private Long quantidade;
     private BigDecimal valorUnitario;
+    /** Falso quando o código do XML não existe no catálogo (decisão A5); o item não movimenta estoque. */
+    private Boolean vinculado;
 }

@@ -31,10 +31,8 @@ class EntradaXmlE2E {
         long antes = estoque(PF_001);
 
         // Prévia: devolve o EntradaInput preenchido, com os itens já ligados ao catálogo pelo código.
-        String limite = "wc-e2e-" + numero;
-        JsonNode previa = json(Stack.semCorpo().contentType("multipart/form-data; boundary=" + limite)
-                .body(multipart(limite, "arquivo", "nfe-" + numero + ".xml", xml))
-                .post("/notas/entrada/importar-xml").then().statusCode(200).extract().asString());
+        JsonNode previa = json(enviar("/notas/entrada/importar-xml", xml).then().statusCode(200).extract()
+                .asString());
         assertThat(previa.path("chaveAcesso").asText()).isEqualTo(chave);
         assertThat(previa.path("numero").asText()).isEqualTo(String.valueOf(numero));
         assertThat(previa.path("fornecedor").path("cnpj").asText()).isEqualTo("11222333000181");
@@ -70,12 +68,62 @@ class EntradaXmlE2E {
      * Corpo multipart montado à mão, com Content-Length: o multipart do RestAssured vai em chunked e o
      * proxy do API Gateway do LocalStack não repassa esse corpo (o navegador manda com tamanho).
      */
+    private static io.restassured.response.Response enviar(String caminho, String xml) {
+        String limite = "wc-e2e-" + System.nanoTime();
+        return Stack.semCorpo().contentType("multipart/form-data; boundary=" + limite)
+                .body(multipart(limite, "arquivo", "nfe.xml", xml)).post(caminho);
+    }
+
     private static byte[] multipart(String limite, String campo, String arquivo, String conteudo) {
         String corpo = "--" + limite + "\r\n"
                 + "Content-Disposition: form-data; name=\"" + campo + "\"; filename=\"" + arquivo + "\"\r\n"
                 + "Content-Type: text/xml\r\n\r\n"
                 + conteudo + "\r\n--" + limite + "--\r\n";
         return corpo.getBytes(StandardCharsets.UTF_8);
+    }
+
+    @Test
+    @DisplayName("TC-B17.3.2 Importação assíncrona com item desconhecido: com_pendencias e estoque só do vinculado")
+    void importacaoComPendencias() throws Exception {
+        long numero = 200_000_000L + (System.currentTimeMillis() / 1000) % 100_000_000L;
+        String chave = chave(numero);
+        long antes = estoque(PF_001);
+
+        JsonNode aceito = json(enviar("/notas/entrada/importar-xml/lote", xml(numero, chave)).then().statusCode(202)
+                .extract().asString());
+        long id = aceito.path("uploadId").asLong();
+        assertThat(aceito.path("s3Key").asText()).endsWith(chave + ".xml");
+
+        JsonNode entrada = aguardarEntrada(id, "com_pendencias");
+        assertThat(item(entrada, "PF-001").path("vinculado").asBoolean()).isTrue();
+        assertThat(item(entrada, "XYZ-999").path("vinculado").asBoolean()).isFalse();
+        assertThat(item(entrada, "XYZ-999").path("produtoId").isNull()).isTrue();
+        aguardarEstoque(PF_001, antes + 100);
+    }
+
+    @Test
+    @DisplayName("TC-B17.3.3 Importação assíncrona de XML malformado: entrada em erro e mensagem na DLQ")
+    void importacaoMalformada() {
+        String quebrado = "<?xml version=\"1.0\"?><nfeProc xmlns=\"http://www.portalfiscal.inf.br/nfe\"><NFe>";
+        long id = json(enviar("/notas/entrada/importar-xml/lote", quebrado).then().statusCode(202).extract()
+                .asString()).path("uploadId").asLong();
+
+        JsonNode entrada = aguardarEntrada(id, "erro");
+        assertThat(entrada.path("erro").asText()).isEqualTo("XML inválido ou não é NF-e");
+
+        JsonNode dlq = Stack.lambda("wc-dlq-redrive", java.util.Map.of("origem", "entry-events-queue", "max", 50,
+                "dryRun", true));
+        assertThat(Stack.algum(dlq.path("mensagens"), m -> m.path("corpo").asText()
+                .matches("(?s).*\"entryId\"\\s*:\\s*" + id + "\\b.*"))).isTrue();
+    }
+
+    private static JsonNode aguardarEntrada(long id, String status) {
+        java.util.concurrent.atomic.AtomicReference<JsonNode> ultima = new java.util.concurrent.atomic.AtomicReference<>();
+        org.awaitility.Awaitility.await("entrada " + id + " " + status).atMost(Stack.PRAZO).until(() -> {
+            ultima.set(json(api().get("/notas/entrada/{id}", id).then().statusCode(200).extract().asString()));
+            return status.equals(ultima.get().path("status").asText());
+        });
+        return ultima.get();
     }
 
     private static JsonNode item(JsonNode entrada, String codigo) {

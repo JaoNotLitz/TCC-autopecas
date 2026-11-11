@@ -12,7 +12,6 @@ import br.com.wcautopecas.commons.erro.ApiException;
 import br.com.wcautopecas.commons.seguranca.JwtService;
 import br.com.wcautopecas.commons.seguranca.Papel;
 import br.com.wcautopecas.commons.seguranca.SessaoStore;
-import br.com.wcautopecas.commons.teste.InfraTeste;
 import br.com.wcautopecas.commons.validacao.Documentos;
 import br.com.wcautopecas.entry.api.NotaFiscalDto;
 import br.com.wcautopecas.entry.entrada.EntradaRepository;
@@ -36,8 +35,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
@@ -46,26 +43,16 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.util.LinkedMultiValueMap;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class EntradaIT {
+class EntradaIT extends BaseIT {
 
     static final String CNPJ = "11222333000181";
     static final long PF_001 = 501;
     static final Map<String, List<JsonNode>> LIDAS = new ConcurrentHashMap<>();
     static final AtomicLong NUMEROS = new AtomicLong(System.currentTimeMillis() % 100_000 * 1000);
     static final AtomicLong NOTAS = new AtomicLong(9000);
-
-    @DynamicPropertySource
-    static void props(DynamicPropertyRegistry r) {
-        InfraTeste.registrar(r);
-    }
 
     @Autowired
     TestRestTemplate http;
@@ -79,8 +66,6 @@ class EntradaIT {
     ObjectMapper mapper;
     @Autowired
     EntradaRepository repo;
-    @MockBean
-    Integracoes integracoes;
 
     String token;
 

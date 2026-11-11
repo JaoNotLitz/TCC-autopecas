@@ -36,10 +36,15 @@ public class EntradaRepository {
         return Optional.ofNullable(entradas.getItem(Key.builder().partitionValue(id).build()));
     }
 
+    /** Entrada que ocupa a chave de acesso; uma importação que terminou em erro não ocupa. */
     public Optional<NotaEntrada> porChave(String chave) {
         var cond = QueryConditional.keyEqualTo(Key.builder().partitionValue(chave).build());
         return ListagemDynamo.todos(entradas.index("chave-index").query(r -> r.queryConditional(cond))).stream()
-                .findFirst();
+                .filter(e -> !"erro".equals(e.getStatus())).findFirst();
+    }
+
+    public void salvar(NotaEntrada e) {
+        entradas.putItem(e);
     }
 
     public List<NotaEntrada> todas() {
