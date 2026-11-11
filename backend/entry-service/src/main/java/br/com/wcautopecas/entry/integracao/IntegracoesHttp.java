@@ -12,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.ResourceAccessException;
+import br.com.wcautopecas.commons.seguranca.TokenServico;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
@@ -25,9 +26,10 @@ public class IntegracoesHttp implements Integracoes {
     private final RestClient produtos;
     private final RestClient fiscal;
 
-    public IntegracoesHttp(EntradasProperties props) {
-        this.produtos = ClienteInterno.criar(props.getProductUrl(), props.getTimeoutChamadas());
-        this.fiscal = ClienteInterno.criar(props.getFiscalUrl(), props.getTimeoutChamadas());
+    /** No XmlProcessorListener não há usuário na requisição: vai o token do usuário técnico (EPB-12). */
+    public IntegracoesHttp(EntradasProperties props, TokenServico sistema) {
+        this.produtos = ClienteInterno.criar(props.getProductUrl(), props.getTimeoutChamadas(), sistema);
+        this.fiscal = ClienteInterno.criar(props.getFiscalUrl(), props.getTimeoutChamadas(), sistema);
     }
 
     @Override

@@ -10,6 +10,14 @@ spring:
     default-property-inclusion: always
   lifecycle:
     timeout-per-shutdown-phase: 30s
+  cloud:
+    aws:
+      endpoint: ${AWS_ENDPOINT_URL:}
+      region:
+        static: ${AWS_REGION:sa-east-1}
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID:test}
+        secret-key: ${AWS_SECRET_ACCESS_KEY:test}
   servlet:
     multipart:
       # HU-B11.2: XML de até 5 MB; acima disso responde 413
@@ -56,6 +64,9 @@ wc:
     tabela-entradas: ${TABLE_ENTRY_NOTES:entry_notes}
     tabela-fornecedores: ${TABLE_SUPPLIERS:suppliers}
     fila-estoque: ${QUEUE_INVENTORY_UPDATES:inventory-updates-queue}
+    fila-entradas: ${QUEUE_ENTRY_EVENTS:entry-events-queue}
+    fila-dlq: ${QUEUE_FISCAL_DLQ:fiscal-dlq}
+    bucket-xml: ${BUCKET_XML:wc-xml-storage}
     product-url: ${PRODUCT_SERVICE_URL:http://product-service:8082}
     fiscal-url: ${FISCAL_SERVICE_URL:http://fiscal-service:8084}
     timeout-chamadas: 2s

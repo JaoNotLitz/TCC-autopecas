@@ -11,6 +11,11 @@ public class EntradasProperties {
     private String tabelaEntradas = "entry_notes";
     private String tabelaFornecedores = "suppliers";
     private String filaEstoque = "inventory-updates-queue";
+    /** EPB-12: importação assíncrona do XML. */
+    private String filaEntradas = "entry-events-queue";
+    /** XML que não dá para ler vai direto para cá (seção 8.6), sem gastar as 3 tentativas. */
+    private String filaDlq = "fiscal-dlq";
+    private String bucketXml = "wc-xml-storage";
     private String productUrl = "http://product-service:8082";
     private String fiscalUrl = "http://fiscal-service:8084";
     private Duration timeoutChamadas = Duration.ofSeconds(2);

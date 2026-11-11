@@ -13,7 +13,7 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecon
 public class NotaEntrada {
 
     private Long id;
-    /** registrada */
+    /** registrada; na importação assíncrona também recebida, com_pendencias e erro */
     private String status;
     /** manual | xml */
     private String origem;
@@ -31,6 +31,10 @@ public class NotaEntrada {
     private Long usuarioId;
     private String registradaEm;
     private List<ItemEntrada> itens;
+    /** Importação assíncrona: onde o XML está no {@code wc-xml-storage}. */
+    private String s3Key;
+    /** Motivo quando {@code status = erro}. */
+    private String erro;
 
     @DynamoDbPartitionKey
     public Long getId() {

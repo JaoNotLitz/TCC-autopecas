@@ -3,6 +3,7 @@ package br.com.wcautopecas.entry.api;
 import br.com.wcautopecas.commons.erro.ValidacaoException;
 import br.com.wcautopecas.commons.seguranca.UsuarioAutenticado;
 import br.com.wcautopecas.entry.entrada.EntradaService;
+import br.com.wcautopecas.entry.entrada.ImportacaoXmlService;
 import br.com.wcautopecas.entry.entrada.NotaEntrada;
 import br.com.wcautopecas.entry.xml.NfeEntradaParser;
 import jakarta.validation.Valid;
@@ -27,9 +28,11 @@ import org.springframework.web.multipart.MultipartFile;
 public class EntradaController {
 
     private final EntradaService service;
+    private final ImportacaoXmlService importacao;
 
-    public EntradaController(EntradaService service) {
+    public EntradaController(EntradaService service, ImportacaoXmlService importacao) {
         this.service = service;
+        this.importacao = importacao;
     }
 
     /** HU-B11.1: registra a nota do fornecedor e devolve a {@code NotaFiscal} ENTRADA. */
@@ -50,6 +53,20 @@ public class EntradaController {
         } catch (NfeEntradaParser.XmlInvalidoException e) {
             throw new ValidacaoException(e.getMessage());
         }
+    }
+
+    /**
+     * Extensão (HU-B11.3): guarda o XML e registra a entrada em segundo plano. Responde 202 com o
+     * {@code uploadId} (= id da entrada); o andamento aparece em {@code GET /api/notas/entrada/{id}}.
+     */
+    @PostMapping(path = "/importar-xml/lote", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public ImportacaoXmlService.LoteAceito importarLote(@RequestPart("arquivo") MultipartFile arquivo,
+            UsuarioAutenticado usuario) throws IOException {
+        if (arquivo.isEmpty()) {
+            throw new ValidacaoException("Envie o arquivo XML da nota");
+        }
+        return importacao.aceitar(arquivo.getBytes(), usuario);
     }
 
     /** Extra (HU-B11.4). */

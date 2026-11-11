@@ -102,6 +102,7 @@ public class EntradaService {
                 e.setCfop(it.cfop());
                 e.setQuantidade(it.quantidade());
                 e.setValorUnitario(it.valorUnitario());
+                e.setVinculado(true);
                 itens.add(e);
                 itensNota.add(new Integracoes.ItemNota(produtos.get(i), it.codigo(), it.descricao(), it.ncm(),
                         it.cfop(), it.quantidade(), it.valorUnitario()));
@@ -132,24 +133,30 @@ public class EntradaService {
             e.setItens(itens);
             repo.criar(e);
 
-            Map<Long, Long> somas = new LinkedHashMap<>();
-            itens.forEach(x -> somas.merge(x.getProdutoId(), x.getQuantidade(), Long::sum));
-            somas.forEach((produto, q) -> {
-                Map<String, Object> op = new LinkedHashMap<>();
-                op.put("type", "increase");
-                op.put("produtoId", produto);
-                op.put("quantidade", q);
-                op.put("referenciaId", id);
-                op.put("referenciaType", "entry");
-                op.put("usuarioId", usuario.id());
-                op.put("motivo", "Entrada NF " + in.numero() + " de " + f.getRazaoSocial());
-                outbox.fila(props.getFilaEstoque(), "increase", op);
-            });
+            somarEstoque(id, itens, in.numero(), f.getRazaoSocial(), usuario.id());
             log.info("entrada {} registrada: fornecedor {}, nota {}, {} itens", id, cnpj, nota.id(), itens.size());
             return nota;
         } finally {
             locks.liberar(lock);
         }
+    }
+
+    /** Um {@code increase} por produto vinculado ({@code referenciaType = entry}); pendentes não movimentam. */
+    void somarEstoque(long entradaId, List<ItemEntrada> itens, String numero, String fornecedor, Long usuarioId) {
+        Map<Long, Long> somas = new LinkedHashMap<>();
+        itens.stream().filter(x -> x.getProdutoId() != null)
+                .forEach(x -> somas.merge(x.getProdutoId(), x.getQuantidade(), Long::sum));
+        somas.forEach((produto, q) -> {
+            Map<String, Object> op = new LinkedHashMap<>();
+            op.put("type", "increase");
+            op.put("produtoId", produto);
+            op.put("quantidade", q);
+            op.put("referenciaId", entradaId);
+            op.put("referenciaType", "entry");
+            op.put("usuarioId", usuarioId);
+            op.put("motivo", "Entrada NF " + numero + " de " + fornecedor);
+            outbox.fila(props.getFilaEstoque(), "increase", op);
+        });
     }
 
     /** Produto pelo id informado ou pelo código no catálogo; códigos desconhecidos → 422 (decisão A5). */
@@ -184,7 +191,7 @@ public class EntradaService {
     }
 
     /** Cria o fornecedor (id numérico) ou atualiza os dados dele; a chave é o CNPJ. */
-    private Fornecedor fornecedor(EntradaInput.Fornecedor in, String cnpj) {
+    Fornecedor fornecedor(EntradaInput.Fornecedor in, String cnpj) {
         String agora = clock.instant().toString();
         Fornecedor f = repo.fornecedor(cnpj).orElse(null);
         if (f == null) {
@@ -245,7 +252,7 @@ public class EntradaService {
         return repo.porId(id).orElseThrow(() -> new NaoEncontradoException("Entrada não encontrada"));
     }
 
-    private LocalDate hoje() {
+    LocalDate hoje() {
         return LocalDate.now(clock.withZone(FUSO));
     }
 }
