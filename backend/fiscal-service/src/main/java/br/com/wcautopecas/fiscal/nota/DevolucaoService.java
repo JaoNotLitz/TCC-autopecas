@@ -114,6 +114,11 @@ public class DevolucaoService {
         n.setClienteUf(original.getClienteUf());
         n.setClienteCidade(original.getClienteCidade());
         n.setClienteEmail(original.getClienteEmail());
+        n.setClienteCep(original.getClienteCep());
+        n.setClienteLogradouro(original.getClienteLogradouro());
+        n.setClienteNumero(original.getClienteNumero());
+        n.setClienteComplemento(original.getClienteComplemento());
+        n.setClienteBairro(original.getClienteBairro());
         n.setNotaReferenciadaId(original.getId());
         n.setChaveReferenciada(original.getChaveAcesso());
         n.setMotivo(motivo == null || motivo.isBlank() ? MOTIVO_PADRAO : motivo.trim());

@@ -133,8 +133,30 @@ class ClienteIT {
         assertThat(c.get("ultimaCompra").isNull()).isTrue();
         assertThat(c.get("ativo").asBoolean()).isTrue();
         List<String> campos = List.of("id", "tipo", "documento", "nome", "email", "telefone", "cidade", "uf",
-                "ativo", "totalCompras", "ultimaCompra");
+                "ativo", "totalCompras", "ultimaCompra", "cep", "logradouro", "numero", "complemento", "bairro");
         assertThat(c.fieldNames()).toIterable().containsExactlyInAnyOrderElementsOf(campos);
+        assertThat(c.get("cep").asText()).isEmpty();
+    }
+
+    @Test
+    void enderecoOpcional() {
+        Map<String, Object> m = input("Oficina Endereço", cpf(), null);
+        m.put("cep", "01310-100");
+        m.put("logradouro", " Avenida Paulista ");
+        m.put("numero", "1000");
+        m.put("complemento", "");
+        m.put("bairro", "Bela Vista");
+        JsonNode c = criar(m);
+        assertThat(c.get("cep").asText()).isEqualTo("01310100");
+        assertThat(c.get("logradouro").asText()).isEqualTo("Avenida Paulista");
+        assertThat(c.get("numero").asText()).isEqualTo("1000");
+        assertThat(c.get("complemento").asText()).isEmpty();
+        assertThat(c.get("bairro").asText()).isEqualTo("Bela Vista");
+
+        Map<String, Object> cepRuim = input("X", cpf(), null);
+        cepRuim.put("cep", "123");
+        assertThat(chamar(HttpMethod.POST, "/api/clientes", cepRuim, vendedor).getBody().get("campos").get(0)
+                .get("campo").asText()).isEqualTo("cep");
     }
 
     @Test

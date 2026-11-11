@@ -160,6 +160,15 @@ public class ClienteService {
         c.setTelefone(tel);
         c.setCidade(vazioParaNull(in.cidade() == null ? null : in.cidade().trim()));
         c.setUf(vazioParaNull(in.uf()));
+        String cep = vazioParaNull(Documentos.digitos(in.cep()));
+        if (cep != null && cep.length() != 8) {
+            throw campo("cep", "CEP deve ter 8 dígitos");
+        }
+        c.setCep(cep);
+        c.setLogradouro(texto(in.logradouro()));
+        c.setNumero(texto(in.numero()));
+        c.setComplemento(texto(in.complemento()));
+        c.setBairro(texto(in.bairro()));
         boolean ativo = in.ativo() == null || in.ativo();
         c.setAtivo(ativo);
         c.setStatus(ativo ? "ativo" : "inativo");
@@ -206,5 +215,9 @@ public class ClienteService {
 
     private static String vazioParaNull(String s) {
         return s == null || s.isBlank() ? null : s;
+    }
+
+    private static String texto(String s) {
+        return s == null || s.isBlank() ? null : s.trim();
     }
 }

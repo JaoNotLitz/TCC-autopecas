@@ -78,6 +78,11 @@ public class CriarNotaDeVenda {
             n.setClienteUf(vazioComoNull(cliente.uf()));
             n.setClienteCidade(vazioComoNull(cliente.cidade()));
             n.setClienteEmail(vazioComoNull(cliente.email()));
+            n.setClienteCep(vazioComoNull(cliente.cep()));
+            n.setClienteLogradouro(vazioComoNull(cliente.logradouro()));
+            n.setClienteNumero(vazioComoNull(cliente.numero()));
+            n.setClienteComplemento(vazioComoNull(cliente.complemento()));
+            n.setClienteBairro(vazioComoNull(cliente.bairro()));
         }
         n.setMetodoPagamento(venda.metodoPagamento());
         n.setBandeira(venda.bandeira());
