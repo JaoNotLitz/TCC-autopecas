@@ -1,7 +1,7 @@
 # Atalhos da stack local. Tudo roda em Docker; nenhuma conta AWS é usada.
 COMPOSE = docker compose -f infra/local/docker-compose.yml --env-file infra/local/.env
 
-.PHONY: up down reset logs status verify build test env redrive observabilidade
+.PHONY: up down reset logs status verify build test env redrive observabilidade e2e
 
 env:
 	@test -f infra/local/.env || cp infra/local/.env.example infra/local/.env
@@ -28,6 +28,13 @@ redrive: ## lista (ou devolve, com dryRun false) as mensagens da fiscal-dlq: mak
 
 observabilidade: ## sobe Prometheus (:9090) e Grafana (:3000) com o painel da WC Autopeças
 	$(COMPOSE) --profile observabilidade up -d prometheus grafana
+
+# Retentativas da SEFAZ em segundos (RF04 da HU-B17.4); o próximo make up volta ao padrão de 1 e 5 minutos.
+e2e: env ## sobe a stack e roda os testes ponta a ponta pelo gateway; relatório em backend/e2e-tests/target/site/relatorio-e2e.html
+	SEFAZ_ESPERAS_RETENTATIVA=2s,2s $(COMPOSE) up -d --build --wait
+	cd backend && mvn -B -Pe2e -pl e2e-tests test; s=$$?; \
+	  mvn -B -q -Pe2e -pl e2e-tests surefire-report:report-only; \
+	  echo "relatório: backend/e2e-tests/target/site/relatorio-e2e.html"; exit $$s
 
 verify: ## confere os recursos criados no LocalStack
 	infra/local/verify.sh

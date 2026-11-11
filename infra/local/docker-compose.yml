@@ -115,6 +115,7 @@ services:
       CUSTOMER_SERVICE_URL: http://customer-service:8081
       PRODUCT_SERVICE_URL: http://product-service:8082
       SEFAZ_URL: http://sefaz-mock:8080
+      SEFAZ_ESPERAS_RETENTATIVA: ${SEFAZ_ESPERAS_RETENTATIVA:-1m,5m}
     depends_on:
       <<: *servico-deps
       sefaz-mock: { condition: service_healthy }

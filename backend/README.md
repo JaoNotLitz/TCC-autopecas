@@ -18,6 +18,7 @@ O contrato da API é o do front React (`dinastiadoge/tcc`): ids numéricos, list
 | `notification-service` | 8088 | EPB-15 | pronto (sem API pública; consome a `email-queue` e a `customer-events-queue`; templates Thymeleaf `welcome`, `sale-confirmation`, `low-stock-alert`, `fiscal-error` e `contador-lote` enviados pelo SES; alertas de estoque crítico, venda e sistema high/critical viram e-mail) |
 | `wc-dlq-lambdas` | Lambda | EPB-16 | pronto (`wc-dlq-monitor`, agendada a cada minuto, alerta quando a `fiscal-dlq` passa do limite; `wc-dlq-redrive` lista e devolve mensagens à fila de origem) |
 | `wc-jwt-authorizer` | Lambda | EPB-02 | pronto (o gateway e as rotas estão em `infra/local/init/ready.d/50-gateway.sh`) |
+| `e2e-tests` | — | EPB-17 | pronto (fluxos de venda, cancelamento, devolução, inutilização, entrada por XML e SEFAZ fora do ar com DLQ e redrive, pelo gateway; só no perfil `e2e`, com `make e2e`). A importação assíncrona do XML (cenários com pendência e XML malformado) entra junto com o EPB-12 |
 
 ## Rodar
 
@@ -25,6 +26,7 @@ O contrato da API é o do front React (`dinastiadoge/tcc`): ids numéricos, list
 cd backend
 mvn verify            # unitários (*Test) + integração (*IT, Testcontainers: precisa de Docker)
 mvn -DskipITs verify  # só unitários
+make e2e              # (na raiz) ponta a ponta na stack do Compose: venda até o DANFE, DLQ e redrive etc.
 ```
 
 Para subir a stack inteira, veja [`infra/local/README.md`](../infra/local/README.md) (`make up` na raiz).
