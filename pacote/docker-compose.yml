@@ -42,7 +42,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 90
-    mem_limit: 1g
+    mem_limit: 1536m
     networks: [wc-net]
 
   redis:

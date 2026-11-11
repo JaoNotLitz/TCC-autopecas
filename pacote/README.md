@@ -30,14 +30,15 @@ Feito para caber num PC de 8 GB com o WSL limitado a 4 GB:
 
 - Cada serviço Java roda com heap de 160 MB, GC serial e só o compilador C1, com teto de 400 MB por container
   (na prática ficam em ~220 MB).
-- LocalStack até 1 GB, simulador da SEFAZ 256 MB, Redis 64 MB.
-- Tudo junto fica em ~2,7 GB, medido com a stack no ar.
+- LocalStack até 1,5 GB, simulador da SEFAZ 256 MB, Redis 64 MB.
+- Medido: ~2,7 GB com a stack parada no ar e ~3,8 GB logo depois dos testes ponta a ponta
+  (aí já contam os três containers das Lambdas, ~130 MB cada, que o LocalStack cria sob demanda).
 
-Para limitar o WSL, crie `C:\Users\<você>\.wslconfig` com:
+Para limitar o WSL num PC de 8 GB, crie `C:\Users\<você>\.wslconfig` com:
 
 ```ini
 [wsl2]
-memory=4GB
+memory=5GB
 ```
 
 e rode `wsl --shutdown` antes de abrir o Docker Desktop de novo.
