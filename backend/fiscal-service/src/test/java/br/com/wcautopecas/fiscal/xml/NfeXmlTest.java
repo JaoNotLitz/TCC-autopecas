@@ -115,6 +115,27 @@ class NfeXmlTest {
         assertThat(x(d, "//*[local-name()='enderDest']/*[local-name()='cMun']")).isEqualTo("3550308");
         assertThat(x(d, "//*[local-name()='dest']/*[local-name()='xNome']")).isEqualTo(NfeXmlBuilder.HOMOLOGACAO_DEST);
         assertThat(x(d, "//*[local-name()='ICMS00']/*[local-name()='vICMS']")).isEqualTo("32.36");
+        assertThat(x(d, "//*[local-name()='enderDest']/*[local-name()='xLgr']")).isEqualTo(NfeXmlBuilder.NAO_INFORMADO);
+        assertThat(x(d, "count(//*[local-name()='enderDest']/*[local-name()='CEP'])")).isEqualTo("0");
+    }
+
+    @Test
+    void nfeComEnderecoDoCadastro() throws Exception {
+        NotaItem n = nota("NFE", "11222333000181", "São Paulo", "SP");
+        n.setClienteCep("01310100");
+        n.setClienteLogradouro("Avenida Paulista");
+        n.setClienteNumero("1000");
+        n.setClienteComplemento("Sala 12");
+        n.setClienteBairro("Bela Vista");
+        String xml = gerar(n, List.of(linha(1, "89.90", 2, "87083010", "5102")));
+        assertThat(XSD.validar(xml)).isEmpty();
+        Document d = ler(xml);
+        String e = "//*[local-name()='enderDest']/*[local-name()='%s']";
+        assertThat(x(d, e.formatted("xLgr"))).isEqualTo("Avenida Paulista");
+        assertThat(x(d, e.formatted("nro"))).isEqualTo("1000");
+        assertThat(x(d, e.formatted("xCpl"))).isEqualTo("Sala 12");
+        assertThat(x(d, e.formatted("xBairro"))).isEqualTo("Bela Vista");
+        assertThat(x(d, e.formatted("CEP"))).isEqualTo("01310100");
     }
 
     @Test

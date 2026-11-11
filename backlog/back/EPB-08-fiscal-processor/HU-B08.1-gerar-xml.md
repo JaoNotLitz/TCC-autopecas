@@ -13,7 +13,7 @@ Como **responsável fiscal**, quero **que o sistema monte o XML da nota com todo
 - RF03 — Devolução: `finNFe = 4`, `NFref/refNFe` com a chave original, CFOP 1202/2202, `tpNF = 0` (entrada).
 - RF04 — NFC-e: `mod = 65`, `tpImp = 4`, `indFinal = 1`, `indPres = 1` (física) ou `2` (virtual), e `infNFeSupl` com `qrCode` e `urlChave` (gerados após a assinatura, usando CSC de teste da configuração).
 - RF05 — `tpAmb = 2` (homologação) no perfil `local`.
-- RF06 — Destinatário com os dados que o cadastro do front tem (`documento`, `nome`, `email`, `cidade`, `uf`): `cMun` vem da tabela IBGE por cidade + UF; `xLgr`, `nro` e `xBairro` recebem "NAO INFORMADO" e `indIEDest = 9` (sem IE). O simulador aceita; emissão real exige endereço completo (seção 5.10 da arquitetura).
+- RF06 — Destinatário com os dados que o cadastro do front tem (`documento`, `nome`, `email`, `cidade`, `uf`): `cMun` vem da tabela IBGE por cidade + UF; `xLgr`, `nro`, `xCpl`, `xBairro` e `CEP` vêm do endereço do cadastro quando existe; sem ele, `xLgr`, `nro` e `xBairro` recebem "NAO INFORMADO". `indIEDest = 9` (sem IE). O simulador aceita as duas formas; emissão real exige o endereço completo.
 
 ## Regras e requisitos não funcionais
 

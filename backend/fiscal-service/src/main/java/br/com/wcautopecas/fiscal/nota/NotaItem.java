@@ -30,6 +30,12 @@ public class NotaItem {
     private String clienteUf;
     private String clienteCidade;
     private String clienteEmail;
+    /** Endereço do cadastro do cliente (opcional) para o {@code enderDest}. */
+    private String clienteCep;
+    private String clienteLogradouro;
+    private String clienteNumero;
+    private String clienteComplemento;
+    private String clienteBairro;
     /** Da venda, para o grupo {@code pag} e o {@code indPres} do XML. */
     private String metodoPagamento;
     private String bandeira;

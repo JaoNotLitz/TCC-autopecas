@@ -116,7 +116,7 @@ class FiscalIT {
         given(integracoes.cliente(anyLong())).willAnswer(inv -> {
             long id = inv.getArgument(0);
             return new Cliente(id, "Cliente " + id, "52998224725", id == 99 ? "Rio de Janeiro" : "São Paulo",
-                    id == 99 ? "RJ" : "SP", "c@teste.com", true);
+                    id == 99 ? "RJ" : "SP", "c@teste.com", true, null, null, null, null, null);
         });
     }
 
@@ -242,7 +242,8 @@ class FiscalIT {
         JsonNode n = notasDaVenda(vendaId).get(0);
         assertThat(n.fieldNames()).toIterable().containsExactlyInAnyOrder("id", "tipo", "numero", "serie",
                 "chaveAcesso", "clienteId", "clienteNome", "clienteDocumento", "fornecedorId", "valorTotal",
-                "emitidaEm", "status", "vendaId", "notaReferenciadaId");
+                "emitidaEm", "status", "vendaId", "notaReferenciadaId", "motivoRejeicao");
+        assertThat(n.get("motivoRejeicao").isNull()).isTrue();
         assertThat(n.get("tipo").asText()).isEqualTo("NFCE");
         // o simulador da SEFAZ pode autorizar antes desta leitura
         assertThat(n.get("status").asText()).isIn("processando", "autorizada");
@@ -526,8 +527,11 @@ class FiscalIT {
         assertThat(chamar(HttpMethod.POST, "/api/notas/" + n.getId() + "/reenviar", null, vendedor).getStatusCode())
                 .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY);
         n.setStatus("rejeitada");
+        n.setCodigoStatus("237");
         n.setMotivoRejeicao("CPF inválido");
         repo.salvarSeStatus(n, "autorizada");
+        assertThat(chamar(HttpMethod.GET, "/api/notas/" + n.getId(), null, vendedor).getBody().get("motivoRejeicao")
+                .asText()).isEqualTo("237 - CPF inválido");
         var r = chamar(HttpMethod.POST, "/api/notas/" + n.getId() + "/reenviar", null, vendedor);
         assertThat(r.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(r.getBody().get("status").asText()).isEqualTo("processando");

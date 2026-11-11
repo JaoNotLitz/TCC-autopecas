@@ -23,6 +23,12 @@ public class ClienteItem {
     private String telefone;
     private String cidade;
     private String uf;
+    /** Endereço opcional (8 dígitos no CEP), usado no {@code enderDest} da NF-e. */
+    private String cep;
+    private String logradouro;
+    private String numero;
+    private String complemento;
+    private String bairro;
     private Boolean ativo;
     /** "ativo" | "inativo", chave do GSI status-index. */
     private String status;

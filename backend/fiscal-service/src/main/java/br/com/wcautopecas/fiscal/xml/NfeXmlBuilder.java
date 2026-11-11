@@ -123,12 +123,19 @@ public class NfeXmlBuilder {
             if (!nfce) {
                 Ibge.Municipio mun = Ibge.municipio(n.getClienteCidade(), n.getClienteUf());
                 Element ed = el(d, "enderDest");
-                el(ed, "xLgr", NAO_INFORMADO);
-                el(ed, "nro", NAO_INFORMADO);
-                el(ed, "xBairro", NAO_INFORMADO);
+                // Endereço do cadastro quando existe; sem ele o simulador aceita "NAO INFORMADO".
+                el(ed, "xLgr", ouNaoInformado(n.getClienteLogradouro()));
+                el(ed, "nro", ouNaoInformado(n.getClienteNumero()));
+                if (n.getClienteComplemento() != null && !n.getClienteComplemento().isBlank()) {
+                    el(ed, "xCpl", limitar(n.getClienteComplemento(), 60));
+                }
+                el(ed, "xBairro", ouNaoInformado(n.getClienteBairro()));
                 el(ed, "cMun", mun.codigo());
                 el(ed, "xMun", mun.nome());
                 el(ed, "UF", mun.uf());
+                if (n.getClienteCep() != null && n.getClienteCep().matches("\\d{8}")) {
+                    el(ed, "CEP", n.getClienteCep());
+                }
                 el(ed, "cPais", "1058");
                 el(ed, "xPais", "BRASIL");
             }
@@ -325,6 +332,10 @@ public class NfeXmlBuilder {
 
     static String qtd(long q) {
         return q + ".0000";
+    }
+
+    private static String ouNaoInformado(String s) {
+        return limitar(s, 60);
     }
 
     private static String limitar(String s, int max) {

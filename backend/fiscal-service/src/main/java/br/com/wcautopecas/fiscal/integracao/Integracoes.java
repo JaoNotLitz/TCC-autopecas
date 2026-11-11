@@ -14,7 +14,8 @@ public interface Integracoes {
     record ItemVenda(long produtoId, long quantidade, BigDecimal valorUnitario) {
     }
 
-    record Cliente(long id, String nome, String documento, String cidade, String uf, String email, boolean ativo) {
+    record Cliente(long id, String nome, String documento, String cidade, String uf, String email, boolean ativo,
+            String cep, String logradouro, String numero, String complemento, String bairro) {
     }
 
     /** Recorte do {@code GET /internal/produtos/{id}}. */

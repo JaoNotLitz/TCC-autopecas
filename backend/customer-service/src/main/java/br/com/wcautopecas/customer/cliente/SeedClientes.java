@@ -58,6 +58,10 @@ public class SeedClientes implements ApplicationRunner {
             c.setTelefone((String) m.get("telefone"));
             c.setCidade((String) m.get("cidade"));
             c.setUf((String) m.get("uf"));
+            c.setCep((String) m.get("cep"));
+            c.setLogradouro((String) m.get("logradouro"));
+            c.setNumero((String) m.get("numero"));
+            c.setBairro((String) m.get("bairro"));
             c.setAtivo(true);
             c.setStatus("ativo");
             c.setTotalCompras(0L);
