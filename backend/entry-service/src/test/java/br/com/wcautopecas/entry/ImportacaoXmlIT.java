@@ -71,6 +71,8 @@ class ImportacaoXmlIT extends BaseIT {
     EntradaRepository repo;
     @Autowired
     EventPublisher publisher;
+    @Autowired
+    br.com.wcautopecas.commons.dynamo.IdGenerator ids;
 
     String token;
     /** Códigos que o "catálogo" conhece neste teste. */
@@ -207,7 +209,7 @@ class ImportacaoXmlIT extends BaseIT {
 
         // ...e uma segunda entrada que chegue à fila com ele fica em erro, sem ir para a DLQ.
         NotaEntrada outra = new NotaEntrada();
-        outra.setId(NOTAS.incrementAndGet() + 1_000_000);
+        outra.setId(ids.proximo("entradas"));
         outra.setStatus("recebida");
         outra.setOrigem("xml");
         outra.setS3Key(r.getBody().get("s3Key").asText());
