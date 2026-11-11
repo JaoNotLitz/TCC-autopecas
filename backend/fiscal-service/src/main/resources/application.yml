@@ -67,6 +67,8 @@ wc:
     secret-certificado: ${SECRET_SEFAZ_CERT:wc-sefaz-certificate}
     sefaz:
       url: ${SEFAZ_URL:http://sefaz-mock:8080}
+      # Espera antes da 2ª e da 3ª tentativa depois de erro de comunicação. O make e2e usa segundos.
+      esperas-retentativa: ${SEFAZ_ESPERAS_RETENTATIVA:1m,5m}
     sales-url: ${SALES_SERVICE_URL:http://sales-service:8083}
     customer-url: ${CUSTOMER_SERVICE_URL:http://customer-service:8081}
     product-url: ${PRODUCT_SERVICE_URL:http://product-service:8082}
