@@ -46,6 +46,9 @@ wc:
       - /swagger-ui.html
   relatorios:
     fiscal-url: ${FISCAL_SERVICE_URL:http://fiscal-service:8084}
+    sales-url: ${SALES_SERVICE_URL:http://sales-service:8083}
+    product-url: ${PRODUCT_SERVICE_URL:http://product-service:8082}
+    customer-url: ${CUSTOMER_SERVICE_URL:http://customer-service:8081}
 ---
 spring:
   config:

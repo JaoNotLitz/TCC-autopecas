@@ -115,6 +115,22 @@ public class VendaService {
                 .toList();
     }
 
+    /** EPB-14: vendas com {@code data} entre o início de {@code de} e o fim de {@code ate} em São Paulo. */
+    public List<br.com.wcautopecas.sales.api.VendaRelatorio> relatorio(String de, String ate) {
+        java.time.ZoneId fuso = java.time.ZoneId.of("America/Sao_Paulo");
+        java.time.Instant inicio = data(de, "de").atStartOfDay(fuso).toInstant();
+        java.time.Instant fim = data(ate, "ate").plusDays(1).atStartOfDay(fuso).toInstant();
+        return repo.todas().stream()
+                .filter(v -> v.getData() != null)
+                .filter(v -> {
+                    java.time.Instant quando = java.time.Instant.parse(v.getData());
+                    return !quando.isBefore(inicio) && quando.isBefore(fim);
+                })
+                .sorted(Comparator.comparing(VendaItem::getData))
+                .map(br.com.wcautopecas.sales.api.VendaRelatorio::de)
+                .toList();
+    }
+
     public VendaDto.Detalhe buscar(long id) {
         VendaItem v = existente(id);
         return VendaDto.detalhe(v, repo.itens(id));

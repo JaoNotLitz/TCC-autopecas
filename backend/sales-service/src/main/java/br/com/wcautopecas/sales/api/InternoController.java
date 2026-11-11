@@ -6,6 +6,8 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -19,6 +21,15 @@ public class InternoController {
 
     public InternoController(VendaService service) {
         this.service = service;
+    }
+
+    /**
+     * EPB-14: vendas do período (dias no fuso da loja), com data e vendedor, para o relatório e o
+     * dashboard do reports-service.
+     */
+    @GetMapping
+    public java.util.List<VendaRelatorio> relatorio(@RequestParam String de, @RequestParam String ate) {
+        return service.relatorio(de, ate);
     }
 
     /** HU-B06.7: o fiscal-service avisa qual nota foi criada para a venda. */

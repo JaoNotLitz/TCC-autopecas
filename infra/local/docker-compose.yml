@@ -154,6 +154,9 @@ services:
       <<: *servico-env
       SERVER_PORT: 8087
       FISCAL_SERVICE_URL: http://fiscal-service:8084
+      SALES_SERVICE_URL: http://sales-service:8083
+      PRODUCT_SERVICE_URL: http://product-service:8082
+      CUSTOMER_SERVICE_URL: http://customer-service:8081
 
   # E-mails por template no SES local (veja em http://localhost:4566/_aws/ses).
   notification-service:

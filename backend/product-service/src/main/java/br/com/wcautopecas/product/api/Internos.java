@@ -19,6 +19,11 @@ public final class Internos {
             String cstIcms, BigDecimal aliquotaIcms) {
     }
 
+    /** GET /internal/produtos/estoque: posição de cada produto ativo, com o reservado (reports-service). */
+    public record PosicaoEstoque(long id, String codigo, String nome, String ncm, long estoqueAtual, long reservado,
+            long disponivel, long estoqueMinimo, String status, BigDecimal precoCusto, BigDecimal precoVenda) {
+    }
+
     /** POST /internal/produtos/por-codigo: {@code produtoId} de cada código, ou null (entry-service). */
     public record CodigoProduto(String codigo, Long produtoId, String nome, boolean ativo) {
     }
